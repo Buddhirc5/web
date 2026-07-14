@@ -1,36 +1,34 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Pan Asia Bank — Reconciliation & Exhibit Platform (POC)
 
-## Getting Started
+Frontend-only prototype of the signed-off Reconciliation & Exhibit Platform.
 
-First, run the development server:
+## Run
 
 ```bash
+cd web
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Sample logins
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Password for all: `demo123`
 
-## Learn More
+| Username   | Role              |
+|------------|-------------------|
+| inputter   | Branch Inputter   |
+| approver   | Branch Approver   |
+| reviewer   | Branch Reviewer   |
+| finance    | Finance Reviewer  |
+| inquiry    | Inquiry (view-only) |
+| admin      | Administrator     |
 
-To learn more about Next.js, take a look at the following resources:
+## What’s included
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Engine 01 detailed matching (auto / suggested / manual + URR)
+- Role workflow queues (submit → approve → review → finance close)
+- RAG dashboard, exhibits, audit trail, freeze / override
+- Light Bulk Engine 02 cycles
+- Mock data persisted in `localStorage` (Reset demo in the header)
