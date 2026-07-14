@@ -19,7 +19,7 @@ type ZeroSpec = {
 /** Zero-balance GL accounts (names/numbers from structure only). */
 export const KOL_ZERO_ACCOUNTS: ZeroSpec[] = [
   { id: "kol_z_hp", glCode: "37045", number: "LK0033704517", name: "HP SUSPENSE AC", currency: "LKR" },
-  { id: "kol_z_susp_lkr", glCode: "18300", number: "000031830019", name: "BRANCH SUSPENSE AC - LKR", currency: "LKR", type: "Suspense" },
+  // BRANCH SUSPENSE AC - LKR is the Engine 01 match playground (seeded separately)
   { id: "kol_z_mtd_eur", glCode: "26050", number: "EU0032605001", name: "MATURED TIME DEPOSITS - EUR", currency: "EUR" },
   { id: "kol_z_susp_aud", glCode: "37040", number: "AU0033704001", name: "BRANCH SUSPENSE AC-AUD", currency: "AUD", type: "Suspense" },
   { id: "kol_z_susp_gbp", glCode: "37040", number: "GB0033704001", name: "BRANCH SUSPENSE AC-GBP", currency: "GBP", type: "Suspense" },

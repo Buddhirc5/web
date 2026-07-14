@@ -49,7 +49,6 @@ export default function ReconDetailPage() {
     () => exhibitLines.filter((l) => l.accountId === account?.id),
     [exhibitLines, account?.id]
   );
-  const hasExhibit = scheduleLines.length > 0 || Boolean(account?.zeroBalance);
 
   const [selDebit, setSelDebit] = useState<string | null>(null);
   const [selCredit, setSelCredit] = useState<string | null>(null);
@@ -59,9 +58,10 @@ export default function ReconDetailPage() {
   const [outAction, setOutAction] = useState<Record<string, string>>({});
   const [tab, setTab] = useState<
     "exhibit" | "match" | "matched" | "outstanding" | "workflow"
-  >(hasExhibit ? "exhibit" : "match");
+  >("match");
   const [matchFlash, setMatchFlash] = useState(false);
   const [overrideReason, setOverrideReason] = useState("");
+  const [tabReady, setTabReady] = useState(false);
 
   useEffect(() => {
     if (account && currentUser && !canAccessAccount(currentUser, account)) {
@@ -90,6 +90,16 @@ export default function ReconDetailPage() {
   const accountExhibits = exhibits.filter(
     (e) => e.accountId === account?.id || e.reconciliationId === reconId
   );
+  const hasUnmatched = unmatchedDebits.length + unmatchedCredits.length > 0;
+  const hasExhibit = scheduleLines.length > 0 || Boolean(account?.zeroBalance);
+  const isMatchDemo = account?.id === "kol_match_demo";
+
+  useEffect(() => {
+    if (!account || tabReady) return;
+    if (isMatchDemo || hasUnmatched) setTab("match");
+    else if (hasExhibit) setTab("exhibit");
+    setTabReady(true);
+  }, [account, isMatchDemo, hasUnmatched, hasExhibit, tabReady]);
 
   const suggested = useMemo(() => {
     const pairs: Array<{ debit: Transaction; credit: Transaction; reason: string }> = [];
@@ -202,6 +212,7 @@ export default function ReconDetailPage() {
             <StatusPill status={recon.status} />
             <Badge tone="red">{account.type}</Badge>
             {account.zeroBalance && <Badge tone="green">Zero balance</Badge>}
+            {isMatchDemo && <Badge tone="amber">Match demo</Badge>}
             {recon.overdue && <Badge tone="amber">Overdue</Badge>}
           </div>
         </div>
@@ -433,6 +444,29 @@ export default function ReconDetailPage() {
 
       {tab === "match" && (
         <div className="space-y-5">
+          {(isMatchDemo || hasUnmatched) && (
+            <div className="rounded-2xl border border-[var(--hairline)] bg-[var(--pab-red-soft)]/40 px-4 py-3 text-sm text-[var(--ink-secondary)]">
+              <p className="font-medium text-ink">How to demo matching</p>
+              <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-xs">
+                <li>
+                  <span className="font-medium text-ink">Suggested</span> — click Confirm
+                  on pairs below (same amount / close dates).
+                </li>
+                <li>
+                  <span className="font-medium text-ink">Manual</span> — select one debit +
+                  one credit (e.g. MAN-DEMO-*), add a comment, Match selected.
+                </li>
+                <li>
+                  <span className="font-medium text-ink">Auto</span> — already done; open
+                  the Matched tab for URR00001–003.
+                </li>
+                <li>
+                  <span className="font-medium text-ink">Outstanding</span> — OUT-DEMO-701
+                  needs a comment before submit.
+                </li>
+              </ol>
+            </div>
+          )}
           {suggested.length > 0 && (
             <section className="rounded-[20px] border border-[var(--hairline)] bg-white p-5">
               <h2 className="font-[family-name:var(--font-outfit)] text-base font-semibold">

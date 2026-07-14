@@ -136,6 +136,11 @@ export default function ReconListPage() {
                   </Link>
                   <p className="text-xs text-[var(--ink-tertiary)]">
                     {account.number} · GL {account.glCode}
+                    {account.id === "kol_match_demo" && (
+                      <span className="ml-2 font-medium text-[var(--pab-red)]">
+                        · Match demo
+                      </span>
+                    )}
                   </p>
                 </td>
                 <td className="px-4 py-3 text-[var(--ink-secondary)]">

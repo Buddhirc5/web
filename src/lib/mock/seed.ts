@@ -140,6 +140,22 @@ export function createSeed(): AppState {
   const exhibitLines = buildKollupitiyaExhibitLines();
   const kolRecs = buildKollupitiyaReconciliations(PERIOD_ID);
 
+  // Engine 01 match playground — easy demo of auto / suggested / manual
+  const matchDemoAccount: Account = {
+    id: "kol_match_demo",
+    number: "000031830019",
+    name: "BRANCH SUSPENSE AC - LKR",
+    type: "Suspense",
+    glCode: "18300",
+    branchId: "br_003",
+    departmentId: "dept_branch_ops",
+    glBalance: 167000,
+    currency: "LKR",
+    zeroBalance: false,
+    scheduleBalance: 167000,
+    ledgerBalance: 167000,
+  };
+
   // Lighter demo accounts on other branches
   const otherAccounts: Account[] = [
     {
@@ -207,11 +223,11 @@ export function createSeed(): AppState {
     },
   ];
 
-  const accounts = [...kolAccounts, ...otherAccounts];
+  const accounts = [matchDemoAccount, ...kolAccounts, ...otherAccounts];
 
-  // Match demo on one Kollupitiya suspense with mock txs
-  const matchDemoAccountId = "kol_z_susp_lkr";
+  const matchDemoAccountId = "kol_match_demo";
   const rawTx: Array<Omit<Transaction, "agingBucket"> & { agingDays: number }> = [
+    // --- Already auto-matched (show in Matched tab) ---
     {
       id: "tx_d1",
       accountId: matchDemoAccountId,
@@ -219,7 +235,7 @@ export function createSeed(): AppState {
       side: "debit",
       amount: 500000,
       valueDate: daysAgo(5),
-      narrative: "Demo remittance inward",
+      narrative: "Auto match — remittance inward",
       matched: true,
       matchId: "m_1",
       agingDays: 5,
@@ -231,7 +247,7 @@ export function createSeed(): AppState {
       side: "credit",
       amount: 500000,
       valueDate: daysAgo(5),
-      narrative: "Demo clearing offset",
+      narrative: "Auto match — clearing offset",
       matched: true,
       matchId: "m_1",
       agingDays: 5,
@@ -243,7 +259,7 @@ export function createSeed(): AppState {
       side: "debit",
       amount: 250000,
       valueDate: daysAgo(18),
-      narrative: "Demo cheque collection",
+      narrative: "Auto match — cheque collection",
       matched: true,
       matchId: "m_2",
       agingDays: 18,
@@ -255,33 +271,138 @@ export function createSeed(): AppState {
       side: "credit",
       amount: 250000,
       valueDate: daysAgo(18),
-      narrative: "Demo cheque realisation",
+      narrative: "Auto match — cheque realisation",
       matched: true,
       matchId: "m_2",
       agingDays: 18,
     },
     {
-      id: "tx_d3",
+      id: "tx_d_auto3",
+      accountId: matchDemoAccountId,
+      refNo: "FT-DEMO-210",
+      side: "debit",
+      amount: 125000,
+      valueDate: daysAgo(8),
+      narrative: "Auto match — card settlement debit",
+      matched: true,
+      matchId: "m_3",
+      agingDays: 8,
+    },
+    {
+      id: "tx_c_auto3",
+      accountId: matchDemoAccountId,
+      refNo: "FT-DEMO-210",
+      side: "credit",
+      amount: 125000,
+      valueDate: daysAgo(8),
+      narrative: "Auto match — card settlement credit",
+      matched: true,
+      matchId: "m_3",
+      agingDays: 8,
+    },
+    // --- Suggested: same amount + close dates, different refs → Confirm ---
+    {
+      id: "tx_d_sug1",
       accountId: matchDemoAccountId,
       refNo: "FT-DEMO-088",
       side: "debit",
       amount: 750000,
-      valueDate: daysAgo(35),
-      narrative: "Demo unmatched debit",
+      valueDate: daysAgo(12),
+      narrative: "Suggested — confirm this debit",
       matched: false,
-      agingDays: 35,
+      agingDays: 12,
     },
     {
-      id: "tx_c3",
+      id: "tx_c_sug1",
       accountId: matchDemoAccountId,
       refNo: "FT-DEMO-099",
       side: "credit",
       amount: 750000,
-      valueDate: daysAgo(34),
-      narrative: "Demo suggested pair credit",
+      valueDate: daysAgo(11),
+      narrative: "Suggested — confirm this credit",
       matched: false,
-      agingDays: 34,
+      agingDays: 11,
     },
+    {
+      id: "tx_d_sug2",
+      accountId: matchDemoAccountId,
+      refNo: "IB-DEMO-301",
+      side: "debit",
+      amount: 88000,
+      valueDate: daysAgo(4),
+      narrative: "Suggested — interbranch debit",
+      matched: false,
+      agingDays: 4,
+    },
+    {
+      id: "tx_c_sug2",
+      accountId: matchDemoAccountId,
+      refNo: "IB-DEMO-302",
+      side: "credit",
+      amount: 88000,
+      valueDate: daysAgo(3),
+      narrative: "Suggested — interbranch credit",
+      matched: false,
+      agingDays: 3,
+    },
+    // --- Manual only: different amounts / far dates → select + comment ---
+    {
+      id: "tx_d_man1",
+      accountId: matchDemoAccountId,
+      refNo: "MAN-DEMO-401",
+      side: "debit",
+      amount: 100000,
+      valueDate: daysAgo(40),
+      narrative: "Manual match needed — partial debit",
+      matched: false,
+      agingDays: 40,
+    },
+    {
+      id: "tx_c_man1",
+      accountId: matchDemoAccountId,
+      refNo: "MAN-DEMO-402",
+      side: "credit",
+      amount: 100000,
+      valueDate: daysAgo(9),
+      narrative: "Manual match needed — offset credit (far date)",
+      matched: false,
+      agingDays: 9,
+    },
+    {
+      id: "tx_d_man2",
+      accountId: matchDemoAccountId,
+      refNo: "MAN-DEMO-501",
+      side: "debit",
+      amount: 45000,
+      valueDate: daysAgo(22),
+      narrative: "Manual — lone debit (pair with credit below)",
+      matched: false,
+      agingDays: 22,
+    },
+    {
+      id: "tx_c_man2",
+      accountId: matchDemoAccountId,
+      refNo: "MAN-DEMO-502",
+      side: "credit",
+      amount: 45000,
+      valueDate: daysAgo(55),
+      narrative: "Manual — lone credit (pair with debit above)",
+      matched: false,
+      agingDays: 55,
+    },
+    // Outstanding with no pair (needs comment to submit)
+    {
+      id: "tx_d_out1",
+      accountId: matchDemoAccountId,
+      refNo: "OUT-DEMO-701",
+      side: "debit",
+      amount: 167000,
+      valueDate: daysAgo(72),
+      narrative: "Outstanding — no pair yet (add comment)",
+      matched: false,
+      agingDays: 72,
+    },
+    // Kandy — suggested same-ref ready to confirm
     {
       id: "tx_kd1",
       accountId: "acc_kandy_atm",
@@ -289,7 +410,7 @@ export function createSeed(): AppState {
       side: "debit",
       amount: 125000,
       valueDate: daysAgo(12),
-      narrative: "Demo ATM cash load",
+      narrative: "Suggested — ATM cash load",
       matched: false,
       agingDays: 12,
     },
@@ -300,7 +421,7 @@ export function createSeed(): AppState {
       side: "credit",
       amount: 125000,
       valueDate: daysAgo(12),
-      narrative: "Demo ATM settlement credit",
+      narrative: "Suggested — ATM settlement credit",
       matched: false,
       agingDays: 12,
     },
@@ -311,7 +432,7 @@ export function createSeed(): AppState {
       side: "debit",
       amount: 287500,
       valueDate: daysAgo(55),
-      narrative: "Demo ATM exception",
+      narrative: "Outstanding ATM exception",
       matched: false,
       agingDays: 55,
     },
@@ -342,7 +463,29 @@ export function createSeed(): AppState {
       createdAt: "2026-07-02T08:00:01.000Z",
       createdBy: "system",
     },
+    {
+      id: "m_3",
+      urr: "URR00003",
+      accountId: matchDemoAccountId,
+      debitTxId: "tx_d_auto3",
+      creditTxId: "tx_c_auto3",
+      method: "auto",
+      amount: 125000,
+      createdAt: "2026-07-02T08:00:02.000Z",
+      createdBy: "system",
+    },
   ];
+
+  const matchDemoRec: Reconciliation = {
+    id: "rec_kol_match_demo",
+    accountId: matchDemoAccountId,
+    periodId: PERIOD_ID,
+    status: "draft",
+    engine: "detailed",
+    comments: [],
+    reconBalance: 167000,
+    overdue: false,
+  };
 
   const otherRecs: Reconciliation[] = [
     {
@@ -420,7 +563,7 @@ export function createSeed(): AppState {
     outstanding: [
       {
         id: "out_1",
-        transactionId: "tx_d3",
+        transactionId: "tx_d_out1",
         accountId: matchDemoAccountId,
         comment: "Demo comment — awaiting confirmation letter.",
         actionTaken: "Demo follow-up logged.",
@@ -451,7 +594,7 @@ export function createSeed(): AppState {
       },
     ],
     exhibitLines,
-    reconciliations: [...kolRecs, ...otherRecs],
+    reconciliations: [matchDemoRec, ...kolRecs, ...otherRecs],
     audit: [
       {
         id: "aud_1",
@@ -547,6 +690,6 @@ export function createSeed(): AppState {
         carriedForward: true,
       },
     ],
-    urrCounter: 3,
+    urrCounter: 4,
   };
 }
