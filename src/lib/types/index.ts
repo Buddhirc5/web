@@ -41,12 +41,18 @@ export interface Branch {
   id: string;
   code: string;
   name: string;
+  address?: string;
+  district?: string;
+  phone?: string;
+  bankCode?: string;
 }
 
 export interface Department {
   id: string;
   code: string;
   name: string;
+  category?: "branch" | "head_office" | "control";
+  description?: string;
 }
 
 export interface ReconPeriod {

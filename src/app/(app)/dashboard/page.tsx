@@ -25,15 +25,27 @@ export default function DashboardPage() {
         ? 100
         : Math.round((closed / reconciliations.length) * 100);
 
-    const byBranch = branches.map((b) => {
-      const accIds = accounts.filter((a) => a.branchId === b.id).map((a) => a.id);
-      const recs = reconciliations.filter((r) => accIds.includes(r.accountId));
-      const done = recs.filter((r) => r.status === "closed").length;
-      const pct = recs.length ? Math.round((done / recs.length) * 100) : 100;
-      const rag =
-        pct === 100 ? ("green" as const) : pct >= 50 ? ("amber" as const) : ("red" as const);
-      return { ...b, total: recs.length, done, pct, rag };
-    });
+    const byBranch = branches
+      .map((b) => {
+        const accIds = accounts.filter((a) => a.branchId === b.id).map((a) => a.id);
+        const recs = reconciliations.filter((r) => accIds.includes(r.accountId));
+        if (recs.length === 0) return null;
+        const done = recs.filter((r) => r.status === "closed").length;
+        const pct = recs.length ? Math.round((done / recs.length) * 100) : 100;
+        const rag =
+          pct === 100 ? ("green" as const) : pct >= 50 ? ("amber" as const) : ("red" as const);
+        return { ...b, total: recs.length, done, pct, rag };
+      })
+      .filter(Boolean) as Array<{
+      id: string;
+      code: string;
+      name: string;
+      district?: string;
+      total: number;
+      done: number;
+      pct: number;
+      rag: "green" | "amber" | "red";
+    }>;
 
     const outstanding = transactions.filter((t) => !t.matched);
     const aging = {
@@ -179,8 +191,9 @@ export default function DashboardPage() {
                     <RagDot status={ragForRecon(r.status, r.overdue)} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{acc.name}</p>
-                      <p className="truncate text-xs text-[var(--ink-tertiary)]">
-                        {branch?.name} · {acc.number}
+                  <p className="truncate text-xs text-[var(--ink-tertiary)]">
+                        {branch?.name}
+                        {branch?.district ? ` · ${branch.district}` : ""} · {acc.number}
                       </p>
                     </div>
                     <StatusPill status={r.status} />
@@ -236,20 +249,31 @@ export default function DashboardPage() {
           </div>
 
           <div className="rounded-[20px] border border-[var(--hairline)] bg-white p-5">
-            <h2 className="font-[family-name:var(--font-outfit)] text-lg font-semibold tracking-tight">
-              Branch RAG
-            </h2>
-            <ul className="mt-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <h2 className="font-[family-name:var(--font-outfit)] text-lg font-semibold tracking-tight">
+                Branch RAG
+              </h2>
+              <Link href="/branches" className="text-xs font-medium text-[var(--pab-red)]">
+                Full network
+              </Link>
+            </div>
+            <ul className="mt-3 max-h-64 space-y-2 overflow-auto scrollbar-thin">
               {stats.byBranch.map((b) => (
                 <li
                   key={b.id}
                   className="flex items-center justify-between rounded-xl px-2 py-2 hover:bg-black/[0.02]"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
                     <RagDot status={b.rag} />
-                    <span className="text-sm">{b.name}</span>
+                    <div className="min-w-0">
+                      <span className="block truncate text-sm">{b.name}</span>
+                      <span className="text-[10px] text-[var(--ink-tertiary)]">
+                        {b.code}
+                        {b.district ? ` · ${b.district}` : ""}
+                      </span>
+                    </div>
                   </div>
-                  <span className="text-xs font-medium text-[var(--ink-secondary)]">
+                  <span className="shrink-0 text-xs font-medium text-[var(--ink-secondary)]">
                     {b.pct}%
                   </span>
                 </li>

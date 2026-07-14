@@ -125,6 +125,9 @@ export default function LoginPage() {
             </div>
           </div>
         </div>
+        <p className="pointer-events-none absolute bottom-4 right-5 text-[10px] tracking-wide text-[var(--ink-tertiary)]/70">
+          Developed by Buddhi Sandeepa
+        </p>
       </div>
     </div>
   );

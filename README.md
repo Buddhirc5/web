@@ -25,10 +25,8 @@ Password for all: `demo123`
 | inquiry    | Inquiry (view-only) |
 | admin      | Administrator     |
 
-## What’s included
+## Real network data
 
-- Engine 01 detailed matching (auto / suggested / manual + URR)
-- Role workflow queues (submit → approve → review → finance close)
-- RAG dashboard, exhibits, audit trail, freeze / override
-- Light Bulk Engine 02 cycles
-- Mock data persisted in `localStorage` (Reset demo in the header)
+- **86 branches** from Pan Asia Bank Annual Report 2023 Branch Network (bank code `7311`)
+- **16 departments** aligned to PABC org + DRG (Finance & Planning, Branch TSM, Operations, Internal Audit, Compliance, etc.)
+- Browse under **Network** in the sidebar

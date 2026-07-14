@@ -1,5 +1,7 @@
-import type { AppState, Match, Reconciliation, Transaction } from "../types";
+import type { Account, AppState, Match, Reconciliation, Transaction } from "../types";
 import { agingBucket } from "../utils";
+import { PABC_BRANCHES } from "./branches";
+import { PABC_DEPARTMENTS } from "./departments";
 
 const PASSWORD = "demo123";
 
@@ -17,27 +19,18 @@ function buildTx(partial: Omit<Transaction, "agingBucket"> & { agingDays: number
 }
 
 export function createSeed(): AppState {
-  const branches = [
-    { id: "br_col", code: "001", name: "Colombo Main" },
-    { id: "br_kandy", code: "012", name: "Kandy City" },
-    { id: "br_galle", code: "024", name: "Galle Fort" },
-    { id: "br_jaf", code: "031", name: "Jaffna" },
-  ];
+  const branches = PABC_BRANCHES;
+  const departments = PABC_DEPARTMENTS;
 
-  const departments = [
-    { id: "dept_ops", code: "OPS", name: "Branch Operations" },
-    { id: "dept_fin", code: "FIN", name: "Finance" },
-    { id: "dept_tsm", code: "TSM", name: "Branch TSM" },
-  ];
-
+  // Demo users anchored to real PABC branches / HO departments
   const users = [
     {
       id: "u_inputter",
       username: "inputter",
       name: "Nimal Perera",
       role: "inputter" as const,
-      branchId: "br_col",
-      departmentId: "dept_ops",
+      branchId: "br_003", // Kollupitiya
+      departmentId: "dept_branch_ops",
       password: PASSWORD,
     },
     {
@@ -45,8 +38,8 @@ export function createSeed(): AppState {
       username: "approver",
       name: "Samanthi Jayasuriya",
       role: "approver" as const,
-      branchId: "br_col",
-      departmentId: "dept_ops",
+      branchId: "br_003",
+      departmentId: "dept_branch_ops",
       password: PASSWORD,
     },
     {
@@ -54,8 +47,8 @@ export function createSeed(): AppState {
       username: "reviewer",
       name: "Rohan Silva",
       role: "reviewer" as const,
-      branchId: "br_col",
-      departmentId: "dept_ops",
+      branchId: "br_003",
+      departmentId: "dept_branch_ops",
       password: PASSWORD,
     },
     {
@@ -63,6 +56,7 @@ export function createSeed(): AppState {
       username: "finance",
       name: "Dilani Fernando",
       role: "finance" as const,
+      branchId: "br_999",
       departmentId: "dept_fin",
       password: PASSWORD,
     },
@@ -71,7 +65,8 @@ export function createSeed(): AppState {
       username: "inquiry",
       name: "Audit Viewer",
       role: "inquiry" as const,
-      departmentId: "dept_tsm",
+      branchId: "br_999",
+      departmentId: "dept_audit",
       password: PASSWORD,
     },
     {
@@ -79,29 +74,30 @@ export function createSeed(): AppState {
       username: "admin",
       name: "System Admin",
       role: "admin" as const,
+      branchId: "br_999",
       departmentId: "dept_tsm",
       password: PASSWORD,
     },
   ];
 
-  const accounts = [
+  const coreAccounts: Account[] = [
     {
       id: "acc_18300",
       number: "183000012345",
       name: "Suspense — Clearing",
-      type: "Suspense" as const,
+      type: "Suspense",
       glCode: "18300",
-      branchId: "br_col",
-      departmentId: "dept_ops",
+      branchId: "br_003", // Kollupitiya
+      departmentId: "dept_branch_ops",
       glBalance: 2450000,
     },
     {
       id: "acc_37040",
       number: "370400098765",
       name: "GL — Interbranch Remittance",
-      type: "GL" as const,
+      type: "GL",
       glCode: "37040",
-      branchId: "br_col",
+      branchId: "br_003",
       departmentId: "dept_ops",
       glBalance: 875000,
     },
@@ -109,33 +105,74 @@ export function createSeed(): AppState {
       id: "acc_18510",
       number: "185100055512",
       name: "Suspense — ATM Settlement",
-      type: "Suspense" as const,
+      type: "Suspense",
       glCode: "18510",
-      branchId: "br_kandy",
-      departmentId: "dept_ops",
+      branchId: "br_005", // Kandy
+      departmentId: "dept_branch_ops",
       glBalance: 412500,
     },
     {
       id: "acc_41020",
       number: "410200011122",
       name: "GL — Cash in Transit",
-      type: "GL" as const,
+      type: "GL",
       glCode: "41020",
-      branchId: "br_galle",
-      departmentId: "dept_ops",
+      branchId: "br_025", // Galle
+      departmentId: "dept_branch_ops",
       glBalance: 0,
     },
     {
       id: "acc_18600",
       number: "186000077788",
       name: "Suspense — Card Acquiring",
-      type: "Suspense" as const,
+      type: "Suspense",
       glCode: "18600",
-      branchId: "br_jaf",
-      departmentId: "dept_ops",
+      branchId: "br_037", // Jaffna
+      departmentId: "dept_branch_ops",
       glBalance: 1567800,
     },
   ];
+
+  // Additional suspense/GL accounts across real island-wide branches for dashboard realism
+  const extraBranchSpecs: Array<{
+    branchId: string;
+    glCode: string;
+    type: "GL" | "Suspense";
+    label: string;
+    balance: number;
+    status: Reconciliation["status"];
+    overdue?: boolean;
+  }> = [
+    { branchId: "br_001", glCode: "18310", type: "Suspense", label: "Suspense — WTC Clearing", balance: 320000, status: "pending_approver" },
+    { branchId: "br_004", glCode: "18320", type: "Suspense", label: "Suspense — Pettah Collections", balance: 185000, status: "draft" },
+    { branchId: "br_012", glCode: "37050", type: "GL", label: "GL — Kurunegala Remittance", balance: 95000, status: "pending_reviewer" },
+    { branchId: "br_013", glCode: "18520", type: "Suspense", label: "Suspense — Matara ATM", balance: 64000, status: "closed" },
+    { branchId: "br_032", glCode: "18330", type: "Suspense", label: "Suspense — Anuradhapura", balance: 210000, status: "pending_finance", overdue: true },
+    { branchId: "br_040", glCode: "18610", type: "Suspense", label: "Suspense — Batticaloa Cards", balance: 128000, status: "draft" },
+    { branchId: "br_010", glCode: "41030", type: "GL", label: "GL — Negombo CIT", balance: 0, status: "closed" },
+    { branchId: "br_011", glCode: "18340", type: "Suspense", label: "Suspense — Gampaha", balance: 77500, status: "pending_approver" },
+    { branchId: "br_007", glCode: "37060", type: "GL", label: "GL — Ratnapura Interbranch", balance: 156000, status: "query", overdue: true },
+    { branchId: "br_073", glCode: "18530", type: "Suspense", label: "Suspense — Trincomalee ATM", balance: 44200, status: "pending_reviewer" },
+    { branchId: "br_034", glCode: "18350", type: "Suspense", label: "Suspense — Vavuniya", balance: 89000, status: "draft" },
+    { branchId: "br_016", glCode: "18620", type: "Suspense", label: "Suspense — Wattala Acquiring", balance: 112000, status: "pending_finance" },
+    { branchId: "br_999", glCode: "39999", type: "GL", label: "GL — HO Control Account", balance: 0, status: "closed" },
+  ];
+
+  const extraAccounts: Account[] = extraBranchSpecs.map((s, i) => {
+    const br = branches.find((b) => b.id === s.branchId)!;
+    return {
+      id: `acc_extra_${i}`,
+      number: `${s.glCode}${br.code}0001`,
+      name: s.label,
+      type: s.type,
+      glCode: s.glCode,
+      branchId: s.branchId,
+      departmentId: s.branchId === "br_999" ? "dept_fin" : "dept_branch_ops",
+      glBalance: s.balance,
+    };
+  });
+
+  const accounts = [...coreAccounts, ...extraAccounts];
 
   const rawTx: Array<Omit<Transaction, "agingBucket">> = [
     // Account 18300 — mix of matched and outstanding
@@ -536,6 +573,22 @@ export function createSeed(): AppState {
       reconBalance: outstandingBalance("acc_18600"),
       overdue: true,
     },
+    ...extraBranchSpecs.map((s, i) => ({
+      id: `rec_extra_${i}`,
+      accountId: `acc_extra_${i}`,
+      periodId: "per_2026_06",
+      status: s.status,
+      engine: "detailed" as const,
+      comments: [] as Reconciliation["comments"],
+      reconBalance: s.balance,
+      overdue: Boolean(s.overdue),
+      ...(s.status !== "draft"
+        ? {
+            submittedAt: "2026-07-02T10:00:00.000Z",
+            submittedBy: "u_inputter",
+          }
+        : {}),
+    })),
   ];
 
   return {
@@ -599,7 +652,7 @@ export function createSeed(): AppState {
         accountNumber: "183000012345",
         urr: "URR00001",
         remarks: "Matched by Ref No FT260628001",
-        branchId: "br_col",
+        branchId: "br_003",
       },
       {
         id: "aud_2",
@@ -612,7 +665,7 @@ export function createSeed(): AppState {
         reconId: "rec_37040",
         previousValue: "draft",
         newValue: "pending_approver",
-        branchId: "br_col",
+        branchId: "br_003",
       },
       {
         id: "aud_3",
@@ -625,7 +678,7 @@ export function createSeed(): AppState {
         reconId: "rec_18510",
         previousValue: "pending_approver",
         newValue: "pending_reviewer",
-        branchId: "br_kandy",
+        branchId: "br_005",
       },
     ],
     notifications: [

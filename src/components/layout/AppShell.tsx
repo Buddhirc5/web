@@ -12,6 +12,7 @@ const nav = [
   { href: "/recon", label: "Reconciliations", roles: ["all"] },
   { href: "/queue", label: "Queue", roles: ["approver", "reviewer", "finance", "admin", "inputter"] },
   { href: "/bulk", label: "Bulk Engine", roles: ["all"] },
+  { href: "/branches", label: "Network", roles: ["all"] },
   { href: "/exhibits", label: "Exhibits", roles: ["all"] },
   { href: "/audit", label: "Audit", roles: ["all"] },
   { href: "/reports", label: "Reports", roles: ["all"] },
@@ -168,7 +169,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </header>
-        <main className="animate-fade-in flex-1 px-6 py-6">{children}</main>
+        <main className="animate-fade-in flex-1 px-6 py-6 pb-12">{children}</main>
+        <p className="pointer-events-none fixed bottom-3 right-4 z-30 text-[10px] tracking-wide text-[var(--ink-tertiary)]/70">
+          Developed by Buddhi Sandeepa
+        </p>
       </div>
     </div>
   );

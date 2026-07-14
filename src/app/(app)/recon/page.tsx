@@ -12,6 +12,12 @@ export default function ReconListPage() {
   const branches = useReconStore((s) => s.branches);
   const [filter, setFilter] = useState<"all" | "open" | "closed">("all");
   const [q, setQ] = useState("");
+  const [branchId, setBranchId] = useState("all");
+
+  const branchOptions = useMemo(() => {
+    const ids = new Set(accounts.map((a) => a.branchId));
+    return branches.filter((b) => ids.has(b.id)).sort((a, b) => a.name.localeCompare(b.name));
+  }, [accounts, branches]);
 
   const rows = useMemo(() => {
     return reconciliations
@@ -20,14 +26,15 @@ export default function ReconListPage() {
         const branch = branches.find((b) => b.id === account.branchId);
         return { r, account, branch };
       })
-      .filter(({ r, account }) => {
+      .filter(({ r, account, branch }) => {
         if (filter === "open" && r.status === "closed") return false;
         if (filter === "closed" && r.status !== "closed") return false;
+        if (branchId !== "all" && account.branchId !== branchId) return false;
         if (!q.trim()) return true;
-        const hay = `${account.name} ${account.number} ${account.glCode}`.toLowerCase();
+        const hay = `${account.name} ${account.number} ${account.glCode} ${branch?.name ?? ""} ${branch?.code ?? ""}`.toLowerCase();
         return hay.includes(q.toLowerCase());
       });
-  }, [reconciliations, accounts, branches, filter, q]);
+  }, [reconciliations, accounts, branches, filter, q, branchId]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -58,12 +65,26 @@ export default function ReconListPage() {
         </div>
       </div>
 
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Search account, GL code…"
-        className="h-11 w-full max-w-md rounded-xl border border-[var(--hairline)] bg-white px-4 text-sm outline-none ring-[var(--pab-red)] focus:ring-2"
-      />
+      <div className="flex flex-wrap gap-3">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search account, GL code, branch…"
+          className="h-11 w-full max-w-md rounded-xl border border-[var(--hairline)] bg-white px-4 text-sm outline-none ring-[var(--pab-red)] focus:ring-2"
+        />
+        <select
+          value={branchId}
+          onChange={(e) => setBranchId(e.target.value)}
+          className="h-11 rounded-xl border border-[var(--hairline)] bg-white px-3 text-sm"
+        >
+          <option value="all">All branches with recon</option>
+          {branchOptions.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.code} — {b.name}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <div className="overflow-hidden rounded-[20px] border border-[var(--hairline)] bg-white">
         <table className="w-full text-left text-sm">
@@ -97,7 +118,14 @@ export default function ReconListPage() {
                     {account.number} · GL {account.glCode}
                   </p>
                 </td>
-                <td className="px-4 py-3 text-[var(--ink-secondary)]">{branch?.name}</td>
+                <td className="px-4 py-3 text-[var(--ink-secondary)]">
+                    <span>{branch?.name}</span>
+                    {branch?.code && (
+                      <span className="ml-1 font-mono text-[10px] text-[var(--ink-tertiary)]">
+                        ({branch.code})
+                      </span>
+                    )}
+                  </td>
                 <td className="px-4 py-3">
                   <Badge>{r.engine === "detailed" ? "Detailed" : "Bulk"}</Badge>
                 </td>
