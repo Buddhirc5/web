@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useReconStore } from "@/store/recon-store";
 import { Badge, RagDot, StatusPill } from "@/components/ui/Status";
+import { canAccessAccount, isBranchScoped } from "@/lib/access";
 import { formatCurrency, ragForRecon } from "@/lib/utils";
 
 export default function ReconListPage() {
+  const currentUser = useReconStore((s) => s.currentUser);
   const reconciliations = useReconStore((s) => s.reconciliations);
   const accounts = useReconStore((s) => s.accounts);
   const branches = useReconStore((s) => s.branches);
@@ -14,27 +16,41 @@ export default function ReconListPage() {
   const [q, setQ] = useState("");
   const [branchId, setBranchId] = useState("all");
 
+  const scoped = currentUser ? isBranchScoped(currentUser.role) : false;
+
+  const visibleAccounts = useMemo(
+    () => accounts.filter((a) => canAccessAccount(currentUser, a)),
+    [accounts, currentUser]
+  );
+
   const branchOptions = useMemo(() => {
-    const ids = new Set(accounts.map((a) => a.branchId));
+    const ids = new Set(visibleAccounts.map((a) => a.branchId));
     return branches.filter((b) => ids.has(b.id)).sort((a, b) => a.name.localeCompare(b.name));
-  }, [accounts, branches]);
+  }, [visibleAccounts, branches]);
 
   const rows = useMemo(() => {
     return reconciliations
       .map((r) => {
-        const account = accounts.find((a) => a.id === r.accountId)!;
+        const account = accounts.find((a) => a.id === r.accountId);
+        if (!account || !canAccessAccount(currentUser, account)) return null;
         const branch = branches.find((b) => b.id === account.branchId);
         return { r, account, branch };
       })
-      .filter(({ r, account, branch }) => {
+      .filter(Boolean)
+      .filter((row) => {
+        const { r, account, branch } = row!;
         if (filter === "open" && r.status === "closed") return false;
         if (filter === "closed" && r.status !== "closed") return false;
-        if (branchId !== "all" && account.branchId !== branchId) return false;
+        if (!scoped && branchId !== "all" && account.branchId !== branchId) return false;
         if (!q.trim()) return true;
         const hay = `${account.name} ${account.number} ${account.glCode} ${branch?.name ?? ""} ${branch?.code ?? ""}`.toLowerCase();
         return hay.includes(q.toLowerCase());
-      });
-  }, [reconciliations, accounts, branches, filter, q, branchId]);
+      }) as Array<{
+      r: (typeof reconciliations)[0];
+      account: (typeof accounts)[0];
+      branch: (typeof branches)[0] | undefined;
+    }>;
+  }, [reconciliations, accounts, branches, filter, q, branchId, currentUser, scoped]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -44,7 +60,9 @@ export default function ReconListPage() {
             Reconciliations
           </h1>
           <p className="mt-1 text-[15px] text-[var(--ink-secondary)]">
-            Detailed Engine 01 accounts for the current period.
+            {scoped
+              ? "Your branch accounts for the current period."
+              : "Detailed Engine 01 accounts for the current period."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -72,18 +90,20 @@ export default function ReconListPage() {
           placeholder="Search account, GL code, branch…"
           className="h-11 w-full max-w-md rounded-xl border border-[var(--hairline)] bg-white px-4 text-sm outline-none ring-[var(--pab-red)] focus:ring-2"
         />
-        <select
-          value={branchId}
-          onChange={(e) => setBranchId(e.target.value)}
-          className="h-11 rounded-xl border border-[var(--hairline)] bg-white px-3 text-sm"
-        >
-          <option value="all">All branches with recon</option>
-          {branchOptions.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.code} — {b.name}
-            </option>
-          ))}
-        </select>
+        {!scoped && (
+          <select
+            value={branchId}
+            onChange={(e) => setBranchId(e.target.value)}
+            className="h-11 rounded-xl border border-[var(--hairline)] bg-white px-3 text-sm"
+          >
+            <option value="all">All branches with recon</option>
+            {branchOptions.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.code} — {b.name}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="overflow-hidden rounded-[20px] border border-[var(--hairline)] bg-white">

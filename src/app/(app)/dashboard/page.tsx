@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { useReconStore } from "@/store/recon-store";
 import { RagDot, StatusPill } from "@/components/ui/Status";
+import { canAccessAccount, isBranchScoped } from "@/lib/access";
 import { formatCurrency, ragForRecon } from "@/lib/utils";
 
 export default function DashboardPage() {
+  const currentUser = useReconStore((s) => s.currentUser);
   const reconciliations = useReconStore((s) => s.reconciliations);
   const accounts = useReconStore((s) => s.accounts);
   const branches = useReconStore((s) => s.branches);
@@ -14,21 +16,26 @@ export default function DashboardPage() {
   const period = useReconStore((s) => s.period);
 
   const stats = useMemo(() => {
-    const closed = reconciliations.filter((r) => r.status === "closed").length;
-    const pending = reconciliations.filter((r) => r.status !== "closed").length;
-    const overdue = reconciliations.filter((r) => r.overdue).length;
-    const escalated = reconciliations.filter(
+    const visibleAccounts = accounts.filter((a) => canAccessAccount(currentUser, a));
+    const visibleAccIds = new Set(visibleAccounts.map((a) => a.id));
+    const visibleRecs = reconciliations.filter((r) => visibleAccIds.has(r.accountId));
+    const visibleTx = transactions.filter((t) => visibleAccIds.has(t.accountId));
+
+    const closed = visibleRecs.filter((r) => r.status === "closed").length;
+    const pending = visibleRecs.filter((r) => r.status !== "closed").length;
+    const overdue = visibleRecs.filter((r) => r.overdue).length;
+    const escalated = visibleRecs.filter(
       (r) => r.status === "query" || r.overdue
     ).length;
     const compliance =
-      reconciliations.length === 0
+      visibleRecs.length === 0
         ? 100
-        : Math.round((closed / reconciliations.length) * 100);
+        : Math.round((closed / visibleRecs.length) * 100);
 
     const byBranch = branches
       .map((b) => {
-        const accIds = accounts.filter((a) => a.branchId === b.id).map((a) => a.id);
-        const recs = reconciliations.filter((r) => accIds.includes(r.accountId));
+        const accIds = visibleAccounts.filter((a) => a.branchId === b.id).map((a) => a.id);
+        const recs = visibleRecs.filter((r) => accIds.includes(r.accountId));
         if (recs.length === 0) return null;
         const done = recs.filter((r) => r.status === "closed").length;
         const pct = recs.length ? Math.round((done / recs.length) * 100) : 100;
@@ -47,7 +54,7 @@ export default function DashboardPage() {
       rag: "green" | "amber" | "red";
     }>;
 
-    const outstanding = transactions.filter((t) => !t.matched);
+    const outstanding = visibleTx.filter((t) => !t.matched);
     const aging = {
       "0-30": outstanding.filter((t) => t.agingBucket === "0-30").length,
       "31-60": outstanding.filter((t) => t.agingBucket === "31-60").length,
@@ -59,17 +66,18 @@ export default function DashboardPage() {
       0
     );
 
-    const needsAttention = reconciliations
+    const needsAttention = visibleRecs
       .filter((r) => r.status !== "closed")
       .sort((a, b) => Number(b.overdue) - Number(a.overdue))
       .slice(0, 6);
 
-    const topAccounts = accounts
+    const topAccounts = visibleAccounts
       .map((a) => {
-        const bal = transactions
+        const fromTx = visibleTx
           .filter((t) => t.accountId === a.id && !t.matched)
           .reduce((s, t) => s + t.amount, 0);
-        return { ...a, outstandingAmt: bal };
+        const bal = fromTx || Math.abs(a.scheduleBalance ?? a.glBalance ?? 0);
+        return { ...a, outstandingAmt: a.zeroBalance ? 0 : bal };
       })
       .sort((a, b) => b.outstandingAmt - a.outstandingAmt)
       .slice(0, 5);
@@ -86,8 +94,9 @@ export default function DashboardPage() {
       outstandingCount: outstanding.length,
       needsAttention,
       topAccounts,
+      scoped: currentUser ? isBranchScoped(currentUser.role) : false,
     };
-  }, [reconciliations, accounts, branches, transactions]);
+  }, [reconciliations, accounts, branches, transactions, currentUser]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -99,7 +108,9 @@ export default function DashboardPage() {
           Reconciliation health
         </h1>
         <p className="mt-1 text-[15px] text-[var(--ink-secondary)]">
-          Bank-wide status at a glance. Drill into anything that needs attention.
+          {stats.scoped
+            ? "Your branch reconciliation health."
+            : "Bank-wide status at a glance. Drill into anything that needs attention."}
         </p>
       </div>
 

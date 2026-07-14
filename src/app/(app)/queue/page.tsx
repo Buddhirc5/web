@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/Status";
 import { useReconStore } from "@/store/recon-store";
+import { canAccessAccount } from "@/lib/access";
 import type { ReconStatus, Role } from "@/lib/types";
 import { formatCurrency, formatDateTime, roleLabel } from "@/lib/utils";
 
@@ -49,11 +50,17 @@ export default function QueuePage() {
     return reconciliations
       .filter((r) => statuses.includes(r.status))
       .map((r) => {
-        const account = accounts.find((a) => a.id === r.accountId)!;
+        const account = accounts.find((a) => a.id === r.accountId);
+        if (!account || !canAccessAccount(currentUser, account)) return null;
         const branch = branches.find((b) => b.id === account.branchId);
         return { r, account, branch };
-      });
-  }, [reconciliations, accounts, branches, statuses]);
+      })
+      .filter(Boolean) as Array<{
+      r: (typeof reconciliations)[0];
+      account: (typeof accounts)[0];
+      branch: (typeof branches)[0] | undefined;
+    }>;
+  }, [reconciliations, accounts, branches, statuses, currentUser]);
 
   const selected = queue.find((q) => q.r.id === selectedId) ?? queue[0];
   const activeId = selected?.r.id;

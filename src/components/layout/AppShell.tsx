@@ -24,11 +24,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const user = useReconStore((s) => s.currentUser);
   const period = useReconStore((s) => s.period);
+  const branches = useReconStore((s) => s.branches);
   const notifications = useReconStore((s) => s.notifications);
   const logout = useReconStore((s) => s.logout);
   const markRead = useReconStore((s) => s.markNotificationRead);
   const resetDemo = useReconStore((s) => s.resetDemo);
   const [openNotif, setOpenNotif] = useState(false);
+
+  const userBranch = branches.find((b) => b.id === user?.branchId);
 
   const items = useMemo(() => {
     if (!user) return [];
@@ -103,6 +106,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="font-[family-name:var(--font-outfit)] text-[15px] font-semibold tracking-tight">
               {period.label}
             </span>
+            {userBranch && (
+              <span className="rounded-full bg-black/[0.04] px-2.5 py-0.5 text-[11px] font-medium text-ink">
+                {userBranch.name} · {userBranch.code}
+              </span>
+            )}
             <span
               className={cn(
                 "rounded-full px-2.5 py-0.5 text-[11px] font-medium",

@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/Button";
 import { useReconStore } from "@/store/recon-store";
 
 const demos = [
-  { user: "inputter", role: "Branch Inputter" },
-  { user: "approver", role: "Approver" },
-  { user: "reviewer", role: "Reviewer" },
-  { user: "finance", role: "Finance" },
+  { user: "kol_inputter", role: "Kollupitiya inputter" },
+  { user: "kol_approver", role: "Kollupitiya approver" },
+  { user: "kol_reviewer", role: "Kollupitiya reviewer" },
+  { user: "kandy_inputter", role: "Kandy inputter" },
+  { user: "galle_inputter", role: "Galle inputter" },
+  { user: "finance", role: "Finance (all)" },
   { user: "inquiry", role: "Inquiry" },
   { user: "admin", role: "Admin" },
 ];
@@ -20,7 +22,7 @@ export default function LoginPage() {
   const user = useReconStore((s) => s.currentUser);
   const hydrated = useReconStore((s) => s.hydrated);
   const loading = useReconStore((s) => s.loading);
-  const [username, setUsername] = useState("inputter");
+  const [username, setUsername] = useState("kol_inputter");
   const [password, setPassword] = useState("demo123");
   const [error, setError] = useState("");
 
@@ -65,7 +67,7 @@ export default function LoginPage() {
               <span className="text-[var(--pab-red)]">& Exhibit</span>
             </h1>
             <p className="mt-3 max-w-sm text-[15px] leading-relaxed text-[var(--ink-secondary)]">
-              Centralized suspense and GL reconciliation for every branch.
+              Branch-wise suspense and GL reconciliation. Branch users only see their own branch.
             </p>
           </div>
 
@@ -96,9 +98,7 @@ export default function LoginPage() {
                 autoComplete="current-password"
               />
             </label>
-            {error && (
-              <p className="mb-3 text-sm text-[var(--red-rag)]">{error}</p>
-            )}
+            {error && <p className="mb-3 text-sm text-[var(--red-rag)]">{error}</p>}
             <Button type="submit" className="w-full" size="lg" disabled={loading}>
               {loading ? "Signing in…" : "Sign in"}
             </Button>
@@ -106,13 +106,14 @@ export default function LoginPage() {
 
           <div className="mt-8">
             <p className="mb-3 text-center text-[11px] font-medium uppercase tracking-wider text-[var(--ink-tertiary)]">
-              Sample logins · password demo123
+              Sample logins · password demo123 · mock data only
             </p>
             <div className="flex flex-wrap justify-center gap-2">
               {demos.map((d) => (
                 <button
                   key={d.user}
                   type="button"
+                  title={d.role}
                   onClick={() => {
                     setUsername(d.user);
                     setPassword("demo123");

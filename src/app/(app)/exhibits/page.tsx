@@ -2,9 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { useReconStore } from "@/store/recon-store";
+import { canAccessAccount } from "@/lib/access";
 import { formatBytes, formatDateTime } from "@/lib/utils";
 
 export default function ExhibitsPage() {
+  const currentUser = useReconStore((s) => s.currentUser);
   const exhibits = useReconStore((s) => s.exhibits);
   const accounts = useReconStore((s) => s.accounts);
   const users = useReconStore((s) => s.users);
@@ -15,10 +17,14 @@ export default function ExhibitsPage() {
 
   const rows = useMemo(() => {
     return exhibits.filter((e) => {
+      if (e.accountId) {
+        const acc = accounts.find((a) => a.id === e.accountId);
+        if (acc && !canAccessAccount(currentUser, acc)) return false;
+      }
       if (!q.trim()) return true;
       return e.name.toLowerCase().includes(q.toLowerCase());
     });
-  }, [exhibits, q]);
+  }, [exhibits, q, accounts, currentUser]);
 
   const editable = canEdit() && !isReadOnlyRole();
 

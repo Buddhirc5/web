@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { createSeed } from "@/lib/mock/seed";
+import { canAccessAccount } from "@/lib/access";
 import type {
   AppState,
   Exhibit,
@@ -436,18 +437,25 @@ export const useReconStore = create<Store>()(
         }
         const recon = get().reconciliations.find((r) => r.id === reconId);
         if (!recon) return;
+        const account = get().accounts.find((a) => a.id === recon.accountId);
+        if (!canAccessAccount(get().currentUser, account!)) {
+          get().showToast("Not your branch", "error");
+          return;
+        }
         const unmatched = get().transactions.filter(
           (t) => t.accountId === recon.accountId && !t.matched
         );
-        const missingComments = unmatched.filter(
-          (t) => !get().outstanding.some((o) => o.transactionId === t.id && o.comment.trim())
-        );
-        if (missingComments.length > 0) {
-          get().showToast(
-            `Add comments for ${missingComments.length} outstanding item(s)`,
-            "error"
+        if (unmatched.length > 0) {
+          const missingComments = unmatched.filter(
+            (t) => !get().outstanding.some((o) => o.transactionId === t.id && o.comment.trim())
           );
-          return;
+          if (missingComments.length > 0) {
+            get().showToast(
+              `Add comments for ${missingComments.length} outstanding item(s)`,
+              "error"
+            );
+            return;
+          }
         }
         if (!comment.trim()) {
           get().showToast("Submission comment required", "error");
@@ -489,6 +497,7 @@ export const useReconStore = create<Store>()(
             previousValue: recon.status,
             newValue: "pending_approver",
             remarks: comment,
+            branchId: account?.branchId,
           }),
           notifications: [
             {
@@ -517,6 +526,11 @@ export const useReconStore = create<Store>()(
         const user = get().currentUser!;
         const recon = get().reconciliations.find((r) => r.id === reconId);
         if (!recon) return;
+        const account = get().accounts.find((a) => a.id === recon.accountId);
+        if (account && !canAccessAccount(user, account) && user.role !== "finance" && user.role !== "admin") {
+          get().showToast("Not your branch", "error");
+          return;
+        }
 
         const allowed: Record<string, ReconStatus[]> = {
           approve: ["pending_approver", "query"],
@@ -721,7 +735,7 @@ export const useReconStore = create<Store>()(
         })),
     }),
     {
-      name: "pabc-recon-poc-v2",
+      name: "pabc-recon-poc-v3",
       partialize: (s) => {
         const {
           currentUser,
@@ -734,6 +748,7 @@ export const useReconStore = create<Store>()(
           matches,
           outstanding,
           exhibits,
+          exhibitLines,
           reconciliations,
           audit,
           notifications,
@@ -753,6 +768,7 @@ export const useReconStore = create<Store>()(
           matches,
           outstanding,
           exhibits,
+          exhibitLines,
           reconciliations,
           audit,
           notifications,

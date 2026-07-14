@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Badge, StatusPill } from "@/components/ui/Status";
 import { useReconStore } from "@/store/recon-store";
+import { canAccessAccount } from "@/lib/access";
 import type { Transaction } from "@/lib/types";
 import {
   cn,
@@ -17,6 +18,7 @@ import {
 
 export default function ReconDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const reconId = params.id;
 
   const reconciliations = useReconStore((s) => s.reconciliations);
@@ -26,6 +28,7 @@ export default function ReconDetailPage() {
   const matches = useReconStore((s) => s.matches);
   const outstanding = useReconStore((s) => s.outstanding);
   const exhibits = useReconStore((s) => s.exhibits);
+  const exhibitLines = useReconStore((s) => s.exhibitLines);
   const users = useReconStore((s) => s.users);
   const currentUser = useReconStore((s) => s.currentUser);
   const period = useReconStore((s) => s.period);
@@ -42,17 +45,29 @@ export default function ReconDetailPage() {
   const recon = reconciliations.find((r) => r.id === reconId);
   const account = accounts.find((a) => a.id === recon?.accountId);
 
+  const scheduleLines = useMemo(
+    () => exhibitLines.filter((l) => l.accountId === account?.id),
+    [exhibitLines, account?.id]
+  );
+  const hasExhibit = scheduleLines.length > 0 || Boolean(account?.zeroBalance);
+
   const [selDebit, setSelDebit] = useState<string | null>(null);
   const [selCredit, setSelCredit] = useState<string | null>(null);
   const [manualComment, setManualComment] = useState("");
   const [submitComment, setSubmitComment] = useState("");
   const [outComment, setOutComment] = useState<Record<string, string>>({});
   const [outAction, setOutAction] = useState<Record<string, string>>({});
-  const [tab, setTab] = useState<"match" | "matched" | "outstanding" | "workflow">(
-    "match"
-  );
+  const [tab, setTab] = useState<
+    "exhibit" | "match" | "matched" | "outstanding" | "workflow"
+  >(hasExhibit ? "exhibit" : "match");
   const [matchFlash, setMatchFlash] = useState(false);
   const [overrideReason, setOverrideReason] = useState("");
+
+  useEffect(() => {
+    if (account && currentUser && !canAccessAccount(currentUser, account)) {
+      router.replace("/recon");
+    }
+  }, [account, currentUser, router]);
 
   const editable =
     canEdit() &&
@@ -111,9 +126,19 @@ export default function ReconDetailPage() {
   const outstandingSum = txs
     .filter((t) => !t.matched)
     .reduce((s, t) => s + (t.side === "debit" ? t.amount : -t.amount), 0);
-  const exhibitTotal = Math.abs(outstandingSum);
+  const scheduleBal = account?.scheduleBalance ?? scheduleLines.reduce((s, l) => s + l.amount, 0);
+  const ledgerBal = account?.ledgerBalance ?? account?.glBalance ?? 0;
+  const difference = scheduleBal - ledgerBal;
+  const exhibitOk = Math.abs(difference) < 0.01;
+  const exhibitTotal = Math.abs(outstandingSum) || Math.abs(scheduleBal);
   const validationDelta = account ? account.glBalance - exhibitTotal : 0;
-  const glOk = account ? Math.abs(validationDelta) < 1 : false;
+  const glOk = account?.zeroBalance
+    ? true
+    : scheduleLines.length > 0
+      ? exhibitOk
+      : account
+        ? Math.abs(validationDelta) < 1
+        : false;
 
   if (!recon || !account) {
     return (
@@ -170,11 +195,13 @@ export default function ReconDetailPage() {
             {account.name}
           </h1>
           <p className="text-sm text-[var(--ink-secondary)]">
-            {account.number} · {branch?.name} · GL {account.glCode}
+            {account.number} · GL {account.glCode}
+            {account.currency ? ` · ${account.currency}` : ""} · {branch?.name}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <StatusPill status={recon.status} />
             <Badge tone="red">{account.type}</Badge>
+            {account.zeroBalance && <Badge tone="green">Zero balance</Badge>}
             {recon.overdue && <Badge tone="amber">Overdue</Badge>}
           </div>
         </div>
@@ -214,7 +241,7 @@ export default function ReconDetailPage() {
         )}
       </div>
 
-      {/* Balance validation strip */}
+      {/* Balance validation / exhibit strip */}
       <div
         className={cn(
           "flex flex-wrap items-center gap-6 rounded-2xl border px-5 py-4",
@@ -226,29 +253,39 @@ export default function ReconDetailPage() {
       >
         <div>
           <p className="text-[11px] uppercase tracking-wide text-[var(--ink-tertiary)]">
-            GL balance
+            Total as per schedule
           </p>
           <p className="font-[family-name:var(--font-outfit)] text-lg font-semibold tabular-nums">
-            {formatCurrency(account.glBalance)}
+            {formatCurrency(scheduleBal)}
           </p>
         </div>
         <div className="text-[var(--ink-tertiary)]">vs</div>
         <div>
           <p className="text-[11px] uppercase tracking-wide text-[var(--ink-tertiary)]">
-            Outstanding exhibit
+            Total as per ledger
           </p>
           <p className="font-[family-name:var(--font-outfit)] text-lg font-semibold tabular-nums">
-            {formatCurrency(exhibitTotal)}
+            {formatCurrency(ledgerBal)}
           </p>
         </div>
         <div>
           <p className="text-[11px] uppercase tracking-wide text-[var(--ink-tertiary)]">
-            Matched value
+            Difference
           </p>
           <p className="font-[family-name:var(--font-outfit)] text-lg font-semibold tabular-nums">
-            {formatCurrency(matchedTotal)}
+            {formatCurrency(difference)}
           </p>
         </div>
+        {matchedTotal > 0 && (
+          <div>
+            <p className="text-[11px] uppercase tracking-wide text-[var(--ink-tertiary)]">
+              Matched value
+            </p>
+            <p className="font-[family-name:var(--font-outfit)] text-lg font-semibold tabular-nums">
+              {formatCurrency(matchedTotal)}
+            </p>
+          </div>
+        )}
         <div className="ml-auto">
           <span
             className={cn(
@@ -258,38 +295,141 @@ export default function ReconDetailPage() {
           >
             {glOk ? "Validated" : "Review variance"}
           </span>
-          {!glOk && (
-            <p className="mt-1 text-right text-[11px] text-[var(--ink-tertiary)]">
-              Δ {formatCurrency(Math.abs(validationDelta))}
-            </p>
-          )}
         </div>
       </div>
 
-      <div className="flex gap-1 border-b border-[var(--hairline)]">
+      <div className="flex flex-wrap gap-1 border-b border-[var(--hairline)]">
         {(
           [
-            ["match", "Match canvas"],
-            ["matched", `Matched (${accountMatches.length})`],
-            ["outstanding", `Outstanding (${unmatchedDebits.length + unmatchedCredits.length})`],
-            ["workflow", "Workflow"],
-          ] as const
-        ).map(([id, label]) => (
+            ...(hasExhibit
+              ? [{ id: "exhibit" as const, label: "Exhibit schedule" }]
+              : []),
+            { id: "match" as const, label: "Match canvas" },
+            { id: "matched" as const, label: `Matched (${accountMatches.length})` },
+            {
+              id: "outstanding" as const,
+              label: `Outstanding (${unmatchedDebits.length + unmatchedCredits.length})`,
+            },
+            { id: "workflow" as const, label: "Workflow" },
+          ] as Array<{
+            id: "exhibit" | "match" | "matched" | "outstanding" | "workflow";
+            label: string;
+          }>
+        ).map((item) => (
           <button
-            key={id}
+            key={item.id}
             type="button"
-            onClick={() => setTab(id)}
+            onClick={() => setTab(item.id)}
             className={cn(
               "px-4 py-2.5 text-sm font-medium transition",
-              tab === id
+              tab === item.id
                 ? "border-b-2 border-[var(--pab-red)] text-ink"
                 : "text-[var(--ink-tertiary)] hover:text-ink"
             )}
           >
-            {label}
+            {item.label}
           </button>
         ))}
       </div>
+
+      {tab === "exhibit" && (
+        <div className="space-y-4">
+          <div className="rounded-[20px] border border-[var(--hairline)] bg-white p-5">
+            <div className="mb-4 grid gap-2 text-sm sm:grid-cols-2">
+              <p>
+                <span className="text-[var(--ink-tertiary)]">Branch </span>
+                {branch?.name} ({branch?.code})
+              </p>
+              <p>
+                <span className="text-[var(--ink-tertiary)]">GL Subhead </span>
+                {account.glCode}
+              </p>
+              <p>
+                <span className="text-[var(--ink-tertiary)]">Acct No </span>
+                <span className="font-mono text-xs">{account.number}</span>
+              </p>
+              <p>
+                <span className="text-[var(--ink-tertiary)]">Month </span>
+                June 2026
+              </p>
+            </div>
+            {account.zeroBalance ? (
+              <p className="rounded-xl bg-[var(--surface-secondary)] px-4 py-8 text-center text-sm text-[var(--ink-secondary)]">
+                Zero-balance account — schedule and ledger are both 0. Ready to submit.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--hairline)] text-xs text-[var(--ink-tertiary)]">
+                      <th className="pb-2 font-medium">Value date</th>
+                      <th className="pb-2 font-medium">Particulars (mock)</th>
+                      <th className="pb-2 font-medium">Ref</th>
+                      <th className="pb-2 font-medium">CCY</th>
+                      <th className="pb-2 font-medium text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scheduleLines.map((line) => (
+                      <tr
+                        key={line.id}
+                        className="border-b border-[var(--hairline)] last:border-0"
+                      >
+                        <td className="py-2.5 whitespace-nowrap">
+                          {formatDate(line.valueDate)}
+                        </td>
+                        <td className="py-2.5">{line.particulars}</td>
+                        <td className="py-2.5 font-mono text-xs text-[var(--ink-tertiary)]">
+                          {line.refNo ?? "—"}
+                        </td>
+                        <td className="py-2.5">{line.currency}</td>
+                        <td className="py-2.5 text-right tabular-nums font-medium">
+                          {formatCurrency(line.amount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t border-[var(--hairline)] text-sm font-semibold">
+                      <td colSpan={4} className="pt-3">
+                        Total as per schedule
+                      </td>
+                      <td className="pt-3 text-right tabular-nums">
+                        {formatCurrency(scheduleBal)}
+                      </td>
+                    </tr>
+                    <tr className="text-sm font-semibold">
+                      <td colSpan={4} className="pt-1">
+                        Total as per ledger
+                      </td>
+                      <td className="pt-1 text-right tabular-nums">
+                        {formatCurrency(ledgerBal)}
+                      </td>
+                    </tr>
+                    <tr className="text-sm font-semibold">
+                      <td colSpan={4} className="pt-1 text-[var(--ink-secondary)]">
+                        Difference
+                      </td>
+                      <td
+                        className={cn(
+                          "pt-1 text-right tabular-nums",
+                          exhibitOk ? "text-[#0e7a32]" : "text-[var(--pab-red)]"
+                        )}
+                      >
+                        {formatCurrency(difference)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+          <p className="text-[11px] text-[var(--ink-tertiary)]">
+            Line particulars are fictional demo data. GL account names and numbers follow
+            Kollupitiya chart structure only.
+          </p>
+        </div>
+      )}
 
       {tab === "match" && (
         <div className="space-y-5">

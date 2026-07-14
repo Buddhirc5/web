@@ -73,6 +73,20 @@ export interface Account {
   branchId: string;
   departmentId: string;
   glBalance: number;
+  currency?: string;
+  zeroBalance?: boolean;
+  ledgerBalance?: number;
+  scheduleBalance?: number;
+}
+
+export interface ExhibitLine {
+  id: string;
+  accountId: string;
+  valueDate: string;
+  particulars: string;
+  currency: string;
+  amount: number;
+  refNo?: string;
 }
 
 export interface Transaction {
@@ -221,6 +235,7 @@ export interface AppState {
   matches: Match[];
   outstanding: OutstandingItem[];
   exhibits: Exhibit[];
+  exhibitLines: ExhibitLine[];
   reconciliations: Reconciliation[];
   audit: AuditEvent[];
   notifications: Notification[];
