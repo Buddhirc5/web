@@ -2,9 +2,11 @@
 
 import { useMemo } from "react";
 import { useReconStore } from "@/store/recon-store";
+import { canAccessAccount } from "@/lib/access";
 import { formatCurrency, statusLabel } from "@/lib/utils";
 
 export default function ReportsPage() {
+  const currentUser = useReconStore((s) => s.currentUser);
   const reconciliations = useReconStore((s) => s.reconciliations);
   const accounts = useReconStore((s) => s.accounts);
   const transactions = useReconStore((s) => s.transactions);
@@ -12,12 +14,17 @@ export default function ReportsPage() {
   const period = useReconStore((s) => s.period);
 
   const report = useMemo(() => {
-    const outstanding = transactions.filter((t) => !t.matched);
+    const visibleAccounts = accounts.filter((a) => canAccessAccount(currentUser, a));
+    const accIds = new Set(visibleAccounts.map((a) => a.id));
+    const visibleRecs = reconciliations.filter((r) => accIds.has(r.accountId));
+    const outstanding = transactions.filter(
+      (t) => !t.matched && accIds.has(t.accountId)
+    );
     return {
       byStatus: (["draft", "pending_approver", "pending_reviewer", "pending_finance", "query", "closed", "rejected"] as const).map(
         (s) => ({
           status: s,
-          count: reconciliations.filter((r) => r.status === s).length,
+          count: visibleRecs.filter((r) => r.status === s).length,
         })
       ),
       aging: {
@@ -26,23 +33,32 @@ export default function ReportsPage() {
         "61-90": outstanding.filter((t) => t.agingBucket === "61-90").length,
         "90+": outstanding.filter((t) => t.agingBucket === "90+").length,
       },
-      branchRows: branches.map((b) => {
-        const accs = accounts.filter((a) => a.branchId === b.id);
-        const recs = reconciliations.filter((r) =>
-          accs.some((a) => a.id === r.accountId)
-        );
-        return {
-          branch: b.name,
-          accounts: accs.length,
-          closed: recs.filter((r) => r.status === "closed").length,
-          pending: recs.filter((r) => r.status !== "closed").length,
-          outstandingAmt: transactions
-            .filter((t) => !t.matched && accs.some((a) => a.id === t.accountId))
-            .reduce((s, t) => s + t.amount, 0),
-        };
-      }),
+      branchRows: branches
+        .map((b) => {
+          const accs = visibleAccounts.filter((a) => a.branchId === b.id);
+          if (accs.length === 0) return null;
+          const recs = visibleRecs.filter((r) =>
+            accs.some((a) => a.id === r.accountId)
+          );
+          return {
+            branch: b.name,
+            accounts: accs.length,
+            closed: recs.filter((r) => r.status === "closed").length,
+            pending: recs.filter((r) => r.status !== "closed").length,
+            outstandingAmt: transactions
+              .filter((t) => !t.matched && accs.some((a) => a.id === t.accountId))
+              .reduce((s, t) => s + t.amount, 0),
+          };
+        })
+        .filter(Boolean) as Array<{
+        branch: string;
+        accounts: number;
+        closed: number;
+        pending: number;
+        outstandingAmt: number;
+      }>,
     };
-  }, [reconciliations, accounts, transactions, branches]);
+  }, [reconciliations, accounts, transactions, branches, currentUser]);
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
