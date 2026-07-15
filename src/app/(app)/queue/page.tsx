@@ -32,6 +32,12 @@ function queueStatusesFor(role: Role): ReconStatus[] {
   }
 }
 
+type QueueRow = {
+  r: ReturnType<typeof useReconStore.getState>["reconciliations"][0];
+  account: ReturnType<typeof useReconStore.getState>["accounts"][0];
+  branch: ReturnType<typeof useReconStore.getState>["branches"][0] | undefined;
+};
+
 export default function QueuePage() {
   const currentUser = useReconStore((s) => s.currentUser);
   const reconciliations = useReconStore((s) => s.reconciliations);
@@ -42,9 +48,13 @@ export default function QueuePage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [comment, setComment] = useState("");
+  const [branchFocus, setBranchFocus] = useState<string | null>(null);
+  const [branchSearch, setBranchSearch] = useState("");
+  const [glSearch, setGlSearch] = useState("");
 
   const role = currentUser?.role ?? "inquiry";
   const statuses = queueStatusesFor(role);
+  const useBranchFirst = role === "finance" || role === "admin";
 
   const queue = useMemo(() => {
     return reconciliations
@@ -55,15 +65,69 @@ export default function QueuePage() {
         const branch = branches.find((b) => b.id === account.branchId);
         return { r, account, branch };
       })
-      .filter(Boolean) as Array<{
-      r: (typeof reconciliations)[0];
-      account: (typeof accounts)[0];
-      branch: (typeof branches)[0] | undefined;
-    }>;
+      .filter(Boolean) as QueueRow[];
   }, [reconciliations, accounts, branches, statuses, currentUser]);
 
-  const selected = queue.find((q) => q.r.id === selectedId) ?? queue[0];
+  const branchGroups = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        branchId: string;
+        branchName: string;
+        branchCode: string;
+        items: QueueRow[];
+      }
+    >();
+    for (const row of queue) {
+      const id = row.account.branchId;
+      const existing = map.get(id);
+      if (existing) {
+        existing.items.push(row);
+      } else {
+        map.set(id, {
+          branchId: id,
+          branchName: row.branch?.name ?? id,
+          branchCode: row.branch?.code ?? "",
+          items: [row],
+        });
+      }
+    }
+    return [...map.values()].sort((a, b) =>
+      a.branchName.localeCompare(b.branchName)
+    );
+  }, [queue]);
+
+  const filteredBranchGroups = useMemo(() => {
+    const q = branchSearch.trim().toLowerCase();
+    if (!q) return branchGroups;
+    return branchGroups.filter((g) =>
+      `${g.branchName} ${g.branchCode}`.toLowerCase().includes(q)
+    );
+  }, [branchGroups, branchSearch]);
+
+  const branchItems = useMemo(() => {
+    if (!branchFocus) return [];
+    const group = branchGroups.find((g) => g.branchId === branchFocus);
+    if (!group) return [];
+    const q = glSearch.trim().toLowerCase();
+    if (!q) return group.items;
+    return group.items.filter((row) => {
+      const hay = `${row.account.name} ${row.account.number} ${row.account.glCode}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [branchFocus, branchGroups, glSearch]);
+
+  const flatList = useBranchFirst
+    ? branchFocus
+      ? branchItems
+      : []
+    : queue;
+
+  const selected =
+    flatList.find((q) => q.r.id === selectedId) ??
+    (useBranchFirst ? branchItems[0] : queue[0]);
   const activeId = selected?.r.id;
+  const focusedBranch = branchGroups.find((g) => g.branchId === branchFocus);
 
   if (role === "inquiry") {
     return (
@@ -121,48 +185,152 @@ export default function QueuePage() {
           Queue
         </h1>
         <p className="mt-1 text-[15px] text-[var(--ink-secondary)]">
-          {roleLabel(role)} · {queue.length} item{queue.length === 1 ? "" : "s"} awaiting action
+          {roleLabel(role)} · {queue.length} item{queue.length === 1 ? "" : "s"}
+          {useBranchFirst
+            ? ` across ${branchGroups.length} branch${branchGroups.length === 1 ? "" : "es"}`
+            : " awaiting action"}
         </p>
       </div>
 
-      <div className="grid min-h-[520px] overflow-hidden rounded-[20px] border border-[var(--hairline)] bg-white lg:grid-cols-[320px_1fr]">
+      <div className="grid min-h-[520px] overflow-hidden rounded-[20px] border border-[var(--hairline)] bg-white lg:grid-cols-[340px_1fr]">
         <div className="border-r border-[var(--hairline)]">
-          <div className="border-b border-[var(--hairline)] px-4 py-3 text-xs font-medium uppercase tracking-wide text-[var(--ink-tertiary)]">
-            Inbox
-          </div>
-          <ul className="scrollbar-thin max-h-[560px] overflow-auto">
-            {queue.map(({ r, account, branch }) => (
-              <li key={r.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedId(r.id);
-                    setComment("");
-                  }}
-                  className={`w-full border-b border-[var(--hairline)] px-4 py-3 text-left transition ${
-                    activeId === r.id ? "bg-[var(--pab-red-soft)]/60" : "hover:bg-black/[0.02]"
-                  }`}
-                >
-                  <p className="truncate text-sm font-semibold">{account.name}</p>
-                  <p className="truncate text-xs text-[var(--ink-tertiary)]">
-                    {branch?.name}
-                  </p>
-                  <div className="mt-1.5">
-                    <StatusPill status={r.status} />
+          {useBranchFirst && !branchFocus ? (
+            <>
+              <div className="border-b border-[var(--hairline)] px-4 py-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-tertiary)]">
+                  Branches
+                </p>
+                <input
+                  value={branchSearch}
+                  onChange={(e) => setBranchSearch(e.target.value)}
+                  placeholder="Search branch…"
+                  className="mt-2 h-9 w-full rounded-lg border border-[var(--hairline)] px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
+                />
+              </div>
+              <ul className="scrollbar-thin max-h-[560px] overflow-auto">
+                {filteredBranchGroups.map((g) => (
+                  <li key={g.branchId}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBranchFocus(g.branchId);
+                        setSelectedId(null);
+                        setGlSearch("");
+                        setComment("");
+                      }}
+                      className="flex w-full items-center justify-between gap-3 border-b border-[var(--hairline)] px-4 py-3 text-left transition hover:bg-black/[0.02]"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{g.branchName}</p>
+                        <p className="truncate text-xs text-[var(--ink-tertiary)]">
+                          {g.branchCode}
+                          {g.branchCode ? " · " : ""}
+                          {g.items.length} GL{g.items.length === 1 ? "" : "s"}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-[var(--pab-red-soft)] px-2.5 py-0.5 text-xs font-semibold text-[var(--pab-red-deep)]">
+                        {g.items.length}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+                {filteredBranchGroups.length === 0 && (
+                  <li className="px-4 py-16 text-center text-sm text-[var(--ink-tertiary)]">
+                    {queue.length === 0
+                      ? "Your queue is empty."
+                      : "No branches match your search."}
+                  </li>
+                )}
+              </ul>
+            </>
+          ) : (
+            <>
+              <div className="border-b border-[var(--hairline)] px-4 py-3">
+                {useBranchFirst && focusedBranch ? (
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBranchFocus(null);
+                        setSelectedId(null);
+                        setGlSearch("");
+                      }}
+                      className="text-xs font-medium text-[var(--pab-red)] hover:underline"
+                    >
+                      ← All branches
+                    </button>
+                    <p className="text-sm font-semibold">{focusedBranch.branchName}</p>
+                    <p className="text-[11px] text-[var(--ink-tertiary)]">
+                      {focusedBranch.items.length} GL
+                      {focusedBranch.items.length === 1 ? "" : "s"} pending
+                    </p>
+                    {focusedBranch.items.length > 8 && (
+                      <input
+                        value={glSearch}
+                        onChange={(e) => setGlSearch(e.target.value)}
+                        placeholder="Search GL / account…"
+                        className="h-9 w-full rounded-lg border border-[var(--hairline)] px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
+                      />
+                    )}
                   </div>
-                </button>
-              </li>
-            ))}
-            {queue.length === 0 && (
-              <li className="px-4 py-16 text-center text-sm text-[var(--ink-tertiary)]">
-                Your queue is empty.
-              </li>
-            )}
-          </ul>
+                ) : (
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-tertiary)]">
+                    Inbox
+                  </p>
+                )}
+              </div>
+              <ul className="scrollbar-thin max-h-[560px] overflow-auto">
+                {flatList.map(({ r, account, branch }) => (
+                  <li key={r.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedId(r.id);
+                        setComment("");
+                      }}
+                      className={`w-full border-b border-[var(--hairline)] px-4 py-3 text-left transition ${
+                        activeId === r.id
+                          ? "bg-[var(--pab-red-soft)]/60"
+                          : "hover:bg-black/[0.02]"
+                      }`}
+                    >
+                      <p className="truncate text-sm font-semibold">{account.name}</p>
+                      <p className="truncate text-xs text-[var(--ink-tertiary)]">
+                        GL {account.glCode}
+                        {!useBranchFirst && branch?.name
+                          ? ` · ${branch.name}`
+                          : ` · ${account.number}`}
+                      </p>
+                      <div className="mt-1.5">
+                        <StatusPill status={r.status} />
+                      </div>
+                    </button>
+                  </li>
+                ))}
+                {flatList.length === 0 && (
+                  <li className="px-4 py-16 text-center text-sm text-[var(--ink-tertiary)]">
+                    {useBranchFirst
+                      ? "No GLs in this branch match."
+                      : "Your queue is empty."}
+                  </li>
+                )}
+              </ul>
+            </>
+          )}
         </div>
 
         <div className="flex flex-col p-6">
-          {!selected ? (
+          {useBranchFirst && !branchFocus ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
+              <p className="font-[family-name:var(--font-outfit)] text-lg font-semibold">
+                Select a branch
+              </p>
+              <p className="max-w-sm text-sm text-[var(--ink-secondary)]">
+                With 80+ branches, review starts at branch level. Open a branch to see its
+                GLs, then act on each account.
+              </p>
+            </div>
+          ) : !selected ? (
             <div className="flex flex-1 items-center justify-center text-sm text-[var(--ink-tertiary)]">
               Select an item to review
             </div>
@@ -174,7 +342,8 @@ export default function QueuePage() {
                     {selected.account.name}
                   </h2>
                   <p className="text-sm text-[var(--ink-secondary)]">
-                    {selected.account.number} · {selected.branch?.name}
+                    {selected.account.number} · GL {selected.account.glCode} ·{" "}
+                    {selected.branch?.name}
                   </p>
                   <div className="mt-2">
                     <StatusPill status={selected.r.status} />

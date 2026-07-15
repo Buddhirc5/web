@@ -32,6 +32,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [openNotif, setOpenNotif] = useState(false);
 
   const userBranch = branches.find((b) => b.id === user?.branchId);
+  const isBranchUnfrozen = useReconStore((s) => s.isBranchUnfrozen);
+  const branchUnlocked =
+    period.freezeStatus === "frozen" &&
+    user?.branchId &&
+    isBranchUnfrozen(user.branchId);
 
   const items = useMemo(() => {
     if (!user) return [];
@@ -115,11 +120,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               className={cn(
                 "rounded-full px-2.5 py-0.5 text-[11px] font-medium",
                 period.freezeStatus === "frozen"
-                  ? "bg-[#ffe8e6] text-[#b42318]"
+                  ? branchUnlocked
+                    ? "bg-[#e5f8ea] text-[#0e7a32]"
+                    : "bg-[#ffe8e6] text-[#b42318]"
                   : "bg-[#e5f8ea] text-[#0e7a32]"
               )}
             >
-              {period.freezeStatus === "frozen" ? "Total Freeze" : "Open"}
+              {period.freezeStatus === "frozen"
+                ? branchUnlocked
+                  ? "Freeze · branch unlocked"
+                  : "Total Freeze"
+                : "Open"}
             </span>
             <span className="text-[12px] text-[var(--ink-tertiary)]">
               Due {formatDate(period.dueDate)}

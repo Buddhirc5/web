@@ -16,6 +16,8 @@ import {
   roleLabel,
 } from "@/lib/utils";
 
+type SortKey = "date" | "amount" | "ref";
+
 export default function ReconDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -33,6 +35,7 @@ export default function ReconDetailPage() {
   const currentUser = useReconStore((s) => s.currentUser);
   const period = useReconStore((s) => s.period);
   const canEdit = useReconStore((s) => s.canEdit);
+  const isBranchUnfrozen = useReconStore((s) => s.isBranchUnfrozen);
   const isReadOnlyRole = useReconStore((s) => s.isReadOnlyRole);
   const confirmSuggestedMatch = useReconStore((s) => s.confirmSuggestedMatch);
   const createManualMatch = useReconStore((s) => s.createManualMatch);
@@ -50,8 +53,8 @@ export default function ReconDetailPage() {
     [exhibitLines, account?.id]
   );
 
-  const [selDebit, setSelDebit] = useState<string | null>(null);
-  const [selCredit, setSelCredit] = useState<string | null>(null);
+  const [selDebits, setSelDebits] = useState<string[]>([]);
+  const [selCredits, setSelCredits] = useState<string[]>([]);
   const [manualComment, setManualComment] = useState("");
   const [submitComment, setSubmitComment] = useState("");
   const [outComment, setOutComment] = useState<Record<string, string>>({});
@@ -62,6 +65,9 @@ export default function ReconDetailPage() {
   const [matchFlash, setMatchFlash] = useState(false);
   const [overrideReason, setOverrideReason] = useState("");
   const [tabReady, setTabReady] = useState(false);
+  const [txSearch, setTxSearch] = useState("");
+  const [txSort, setTxSort] = useState<SortKey>("date");
+  const [matchedSearch, setMatchedSearch] = useState("");
 
   useEffect(() => {
     if (account && currentUser && !canAccessAccount(currentUser, account)) {
@@ -70,13 +76,17 @@ export default function ReconDetailPage() {
   }, [account, currentUser, router]);
 
   const editable =
-    canEdit() &&
+    canEdit(account?.id) &&
     !isReadOnlyRole() &&
     recon &&
     (recon.status === "draft" || recon.status === "rejected" || recon.status === "query") &&
     (currentUser?.role === "inputter" || currentUser?.role === "admin");
 
-  const frozenBlocked = period.freezeStatus === "frozen" && !canEdit();
+  const branchUnfrozen = account ? isBranchUnfrozen(account.branchId) : false;
+  const frozenBlocked =
+    period.freezeStatus === "frozen" &&
+    !branchUnfrozen &&
+    currentUser?.role !== "admin";
 
   const txs = useMemo(
     () => transactions.filter((t) => t.accountId === account?.id),
@@ -102,17 +112,25 @@ export default function ReconDetailPage() {
   }, [account, isMatchDemo, hasUnmatched, hasExhibit, tabReady]);
 
   const suggested = useMemo(() => {
-    const pairs: Array<{ debit: Transaction; credit: Transaction; reason: string }> = [];
+    const pairs: Array<{
+      debit: Transaction;
+      credit: Transaction;
+      reason: string;
+    }> = [];
+    const usedCredits = new Set<string>();
     for (const d of unmatchedDebits) {
       const byRef = unmatchedCredits.find(
-        (c) => c.refNo === d.refNo && c.amount === d.amount
+        (c) =>
+          !usedCredits.has(c.id) && c.refNo === d.refNo && c.amount === d.amount
       );
       if (byRef) {
         pairs.push({ debit: d, credit: byRef, reason: "Same Ref No + amount" });
+        usedCredits.add(byRef.id);
         continue;
       }
       const byAmt = unmatchedCredits.find(
         (c) =>
+          !usedCredits.has(c.id) &&
           c.amount === d.amount &&
           Math.abs(
             new Date(c.valueDate).getTime() - new Date(d.valueDate).getTime()
@@ -121,15 +139,10 @@ export default function ReconDetailPage() {
       );
       if (byAmt) {
         pairs.push({ debit: d, credit: byAmt, reason: "Amount + date proximity" });
+        usedCredits.add(byAmt.id);
       }
     }
-    // unique by debit
-    const seen = new Set<string>();
-    return pairs.filter((p) => {
-      if (seen.has(p.debit.id)) return false;
-      seen.add(p.debit.id);
-      return true;
-    });
+    return pairs;
   }, [unmatchedDebits, unmatchedCredits]);
 
   const matchedTotal = accountMatches.reduce((s, m) => s + m.amount, 0);
@@ -150,6 +163,52 @@ export default function ReconDetailPage() {
         ? Math.abs(validationDelta) < 1
         : false;
 
+  const debitSum = useMemo(
+    () =>
+      selDebits.reduce(
+        (s, id) => s + (txs.find((t) => t.id === id)?.amount ?? 0),
+        0
+      ),
+    [selDebits, txs]
+  );
+  const creditSum = useMemo(
+    () =>
+      selCredits.reduce(
+        (s, id) => s + (txs.find((t) => t.id === id)?.amount ?? 0),
+        0
+      ),
+    [selCredits, txs]
+  );
+  const totalsBalance =
+    selDebits.length > 0 &&
+    selCredits.length > 0 &&
+    Math.abs(debitSum - creditSum) < 0.01;
+  const isMm =
+    selDebits.length > 1 && selCredits.length > 1;
+  const matchShapeOk =
+    selDebits.length > 0 &&
+    selCredits.length > 0 &&
+    !isMm;
+  const matchModeLabel =
+    selDebits.length <= 1 && selCredits.length <= 1
+      ? "1 ↔ 1"
+      : selDebits.length === 1
+        ? "1 ↔ M"
+        : selCredits.length === 1
+          ? "M ↔ 1"
+          : "M ↔ M (blocked)";
+
+  const filteredMatched = useMemo(() => {
+    const q = matchedSearch.trim().toLowerCase();
+    if (!q) return accountMatches;
+    return accountMatches.filter((m) => {
+      const legs = [...m.debitTxIds, ...m.creditTxIds]
+        .map((id) => txs.find((t) => t.id === id)?.refNo ?? "")
+        .join(" ");
+      return `${m.urr} ${m.method} ${m.comment ?? ""} ${legs}`.toLowerCase().includes(q);
+    });
+  }, [accountMatches, matchedSearch, txs]);
+
   if (!recon || !account) {
     return (
       <div className="mx-auto max-w-3xl py-20 text-center">
@@ -163,20 +222,45 @@ export default function ReconDetailPage() {
 
   const branch = branches.find((b) => b.id === account.branchId);
 
+  function toggleSelect(
+    side: "debit" | "credit",
+    id: string
+  ) {
+    if (side === "debit") {
+      setSelDebits((prev) => {
+        if (prev.includes(id)) return prev.filter((x) => x !== id);
+        // If credits already multi, keep debit to single (avoid M:M)
+        if (selCredits.length > 1) return [id];
+        return [...prev, id];
+      });
+    } else {
+      setSelCredits((prev) => {
+        if (prev.includes(id)) return prev.filter((x) => x !== id);
+        if (selDebits.length > 1) return [id];
+        return [...prev, id];
+      });
+    }
+  }
+
   async function onConfirmSuggested(d: string, c: string) {
-    await confirmSuggestedMatch(account!.id, d, c);
+    await confirmSuggestedMatch(account!.id, [d], [c]);
     setMatchFlash(true);
     setTimeout(() => setMatchFlash(false), 600);
-    setSelDebit(null);
-    setSelCredit(null);
+    setSelDebits([]);
+    setSelCredits([]);
   }
 
   async function onManualMatch() {
-    if (!selDebit || !selCredit) return;
-    await createManualMatch(account!.id, selDebit, selCredit, manualComment);
+    if (!matchShapeOk || !totalsBalance) return;
+    await createManualMatch(
+      account!.id,
+      selDebits,
+      selCredits,
+      manualComment
+    );
     setManualComment("");
-    setSelDebit(null);
-    setSelCredit(null);
+    setSelDebits([]);
+    setSelCredits([]);
     setMatchFlash(true);
     setTimeout(() => setMatchFlash(false), 600);
   }
@@ -189,6 +273,22 @@ export default function ReconDetailPage() {
       name: file.name,
       size: file.size,
     });
+  }
+
+  function matchLegLabel(m: (typeof accountMatches)[0]) {
+    const debits = m.debitTxIds
+      .map((id) => txs.find((t) => t.id === id)?.refNo ?? id)
+      .join(", ");
+    const credits = m.creditTxIds
+      .map((id) => txs.find((t) => t.id === id)?.refNo ?? id)
+      .join(", ");
+    const shape =
+      m.debitTxIds.length === 1 && m.creditTxIds.length === 1
+        ? "1↔1"
+        : m.debitTxIds.length === 1
+          ? "1↔M"
+          : "M↔1";
+    return { debits, credits, shape };
   }
 
   return (
@@ -214,6 +314,9 @@ export default function ReconDetailPage() {
             {account.zeroBalance && <Badge tone="green">Zero balance</Badge>}
             {isMatchDemo && <Badge tone="amber">Match demo</Badge>}
             {recon.overdue && <Badge tone="amber">Overdue</Badge>}
+            {period.freezeStatus === "frozen" && branchUnfrozen && (
+              <Badge tone="green">Branch unlocked</Badge>
+            )}
           </div>
         </div>
         {editable && (
@@ -231,28 +334,30 @@ export default function ReconDetailPage() {
         )}
         {frozenBlocked && (
           <div className="rounded-2xl border border-[#ffccc7] bg-[#fff2f0] p-4 sm:max-w-xs">
-            <p className="text-sm font-medium text-[#b42318]">Period frozen</p>
+            <p className="text-sm font-medium text-[#b42318]">Branch frozen</p>
             <p className="mt-1 text-xs text-[var(--ink-secondary)]">
-              Request a Finance override to amend.
+              Request a Finance override for <strong>{branch?.name}</strong> — unlocks
+              all GLs at this branch, not just this account.
             </p>
             <textarea
               value={overrideReason}
               onChange={(e) => setOverrideReason(e.target.value)}
               className="mt-2 h-16 w-full rounded-lg border border-[var(--hairline)] p-2 text-xs"
-              placeholder="Reason…"
+              placeholder="Reason for branch unlock…"
             />
             <Button
               size="sm"
               className="mt-2"
-              onClick={() => void requestFreezeOverride(reconId, overrideReason)}
+              onClick={() =>
+                void requestFreezeOverride(account.branchId, overrideReason)
+              }
             >
-              Request override
+              Request branch override
             </Button>
           </div>
         )}
       </div>
 
-      {/* Balance validation / exhibit strip */}
       <div
         className={cn(
           "flex flex-wrap items-center gap-6 rounded-2xl border px-5 py-4",
@@ -435,10 +540,6 @@ export default function ReconDetailPage() {
               </div>
             )}
           </div>
-          <p className="text-[11px] text-[var(--ink-tertiary)]">
-            Line particulars are fictional demo data. GL account names and numbers follow
-            Kollupitiya chart structure only.
-          </p>
         </div>
       )}
 
@@ -446,34 +547,35 @@ export default function ReconDetailPage() {
         <div className="space-y-5">
           {(isMatchDemo || hasUnmatched) && (
             <div className="rounded-2xl border border-[var(--hairline)] bg-[var(--pab-red-soft)]/40 px-4 py-3 text-sm text-[var(--ink-secondary)]">
-              <p className="font-medium text-ink">How to demo matching</p>
+              <p className="font-medium text-ink">Matching rules</p>
               <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-xs">
                 <li>
-                  <span className="font-medium text-ink">Suggested</span> — click Confirm
-                  on pairs below (same amount / close dates).
+                  <span className="font-medium text-ink">1↔1, 1↔M, or M↔1</span> — many-to-many
+                  is blocked. Debit and credit totals must balance.
                 </li>
                 <li>
-                  <span className="font-medium text-ink">Manual</span> — select one debit +
-                  one credit (e.g. MAN-DEMO-*), add a comment, Match selected.
+                  Try <span className="font-medium text-ink">SPLIT-DEMO-*</span> (1↔M) or{" "}
+                  <span className="font-medium text-ink">MERGE-DEMO-*</span> (M↔1).
                 </li>
                 <li>
-                  <span className="font-medium text-ink">Auto</span> — already done; open
-                  the Matched tab for URR00001–003.
-                </li>
-                <li>
-                  <span className="font-medium text-ink">Outstanding</span> — OUT-DEMO-701
-                  needs a comment before submit.
+                  Use search/sort when there are 100+ unmatched rows (BULK-* volume).
                 </li>
               </ol>
             </div>
           )}
+
           {suggested.length > 0 && (
             <section className="rounded-[20px] border border-[var(--hairline)] bg-white p-5">
-              <h2 className="font-[family-name:var(--font-outfit)] text-base font-semibold">
-                Suggested matches
-              </h2>
-              <ul className="mt-3 space-y-2">
-                {suggested.map((s) => (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="font-[family-name:var(--font-outfit)] text-base font-semibold">
+                  Suggested matches
+                </h2>
+                <p className="text-xs text-[var(--ink-tertiary)]">
+                  Showing {Math.min(suggested.length, 12)} of {suggested.length}
+                </p>
+              </div>
+              <ul className="mt-3 max-h-[280px] space-y-2 overflow-auto">
+                {suggested.slice(0, 12).map((s) => (
                   <li
                     key={s.debit.id}
                     className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--surface-secondary)] px-4 py-3"
@@ -501,13 +603,76 @@ export default function ReconDetailPage() {
             </section>
           )}
 
+          <div className="sticky top-14 z-20 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--hairline)] bg-white/95 px-4 py-3 shadow-[var(--shadow-soft)] backdrop-blur">
+            <input
+              value={txSearch}
+              onChange={(e) => setTxSearch(e.target.value)}
+              placeholder="Search ref, narrative, amount…"
+              className="h-9 min-w-[180px] flex-1 rounded-lg border border-[var(--hairline)] px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
+            />
+            <select
+              value={txSort}
+              onChange={(e) => setTxSort(e.target.value as SortKey)}
+              className="h-9 rounded-lg border border-[var(--hairline)] bg-white px-2 text-sm"
+            >
+              <option value="date">Sort: date</option>
+              <option value="amount">Sort: amount</option>
+              <option value="ref">Sort: ref</option>
+            </select>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded-full bg-[var(--surface-secondary)] px-2.5 py-1 font-medium">
+                {matchModeLabel}
+              </span>
+              <span className="tabular-nums text-[var(--ink-secondary)]">
+                Dr {formatCurrency(debitSum)}
+              </span>
+              <span className="text-[var(--ink-tertiary)]">vs</span>
+              <span className="tabular-nums text-[var(--ink-secondary)]">
+                Cr {formatCurrency(creditSum)}
+              </span>
+              {(selDebits.length > 0 || selCredits.length > 0) && (
+                <span
+                  className={cn(
+                    "rounded-full px-2.5 py-1 font-semibold",
+                    isMm
+                      ? "bg-[#ffe8e6] text-[#b42318]"
+                      : totalsBalance
+                        ? "bg-[#e5f8ea] text-[#0e7a32]"
+                        : "bg-[#fff4e0] text-[#9a6700]"
+                  )}
+                >
+                  {isMm
+                    ? "M↔M blocked"
+                    : totalsBalance
+                      ? "Balanced"
+                      : `Δ ${formatCurrency(Math.abs(debitSum - creditSum))}`}
+                </span>
+              )}
+              {(selDebits.length > 0 || selCredits.length > 0) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelDebits([]);
+                    setSelCredits([]);
+                  }}
+                  className="text-[var(--pab-red)] hover:underline"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
           <div className="grid gap-4 lg:grid-cols-[1fr_auto_1fr]">
             <TxColumn
               title="Unmatched debits"
               items={unmatchedDebits}
-              selected={selDebit}
-              onSelect={setSelDebit}
+              selected={selDebits}
+              onToggle={(id) => toggleSelect("debit", id)}
               side="debit"
+              search={txSearch}
+              sort={txSort}
+              multiHint={selCredits.length > 1 ? "single only (credits multi)" : "multi-select OK"}
             />
             <div className="flex flex-col items-center justify-center gap-3 py-4">
               <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--ink-tertiary)]">
@@ -523,11 +688,15 @@ export default function ReconDetailPage() {
                   />
                   <Button
                     size="sm"
-                    disabled={!selDebit || !selCredit}
+                    disabled={!matchShapeOk || !totalsBalance || !manualComment.trim()}
                     onClick={() => void onManualMatch()}
                   >
                     Match selected
                   </Button>
+                  <p className="max-w-[160px] text-center text-[10px] text-[var(--ink-tertiary)]">
+                    {selDebits.length} debit{selDebits.length === 1 ? "" : "s"} ·{" "}
+                    {selCredits.length} credit{selCredits.length === 1 ? "" : "s"}
+                  </p>
                 </>
               ) : (
                 <p className="max-w-[140px] text-center text-xs text-[var(--ink-tertiary)]">
@@ -538,66 +707,116 @@ export default function ReconDetailPage() {
             <TxColumn
               title="Unmatched credits"
               items={unmatchedCredits}
-              selected={selCredit}
-              onSelect={setSelCredit}
+              selected={selCredits}
+              onToggle={(id) => toggleSelect("credit", id)}
               side="credit"
+              search={txSearch}
+              sort={txSort}
+              multiHint={selDebits.length > 1 ? "single only (debits multi)" : "multi-select OK"}
             />
           </div>
         </div>
       )}
 
       {tab === "matched" && (
-        <div className="overflow-hidden rounded-[20px] border border-[var(--hairline)] bg-white">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-[var(--hairline)] text-xs text-[var(--ink-tertiary)]">
-                <th className="px-4 py-3 font-medium">URR</th>
-                <th className="px-4 py-3 font-medium">Method</th>
-                <th className="px-4 py-3 font-medium">Amount</th>
-                <th className="px-4 py-3 font-medium">Created</th>
-                <th className="px-4 py-3 font-medium" />
-              </tr>
-            </thead>
-            <tbody>
-              {accountMatches.map((m) => (
-                <tr key={m.id} className="border-b border-[var(--hairline)] last:border-0">
-                  <td className="px-4 py-3 font-mono text-xs font-semibold text-[var(--pab-red)]">
-                    {m.urr}
-                  </td>
-                  <td className="px-4 py-3 capitalize">
-                    <Badge tone={m.method === "manual" ? "amber" : "green"}>
-                      {m.method}
-                    </Badge>
-                    {m.comment && (
-                      <p className="mt-1 text-xs text-[var(--ink-tertiary)]">{m.comment}</p>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 tabular-nums">{formatCurrency(m.amount)}</td>
-                  <td className="px-4 py-3 text-[var(--ink-secondary)]">
-                    {formatDateTime(m.createdAt)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {editable && m.method !== "auto" && (
-                      <Button variant="ghost" size="sm" onClick={() => void unmatch(m.id)}>
-                        Unmatch
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {accountMatches.length === 0 && (
-            <p className="py-10 text-center text-sm text-[var(--ink-tertiary)]">
-              No matches yet.
-            </p>
+        <div className="space-y-3">
+          {accountMatches.length > 8 && (
+            <input
+              value={matchedSearch}
+              onChange={(e) => setMatchedSearch(e.target.value)}
+              placeholder="Search URR, ref, method…"
+              className="h-10 w-full max-w-md rounded-xl border border-[var(--hairline)] px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
+            />
           )}
+          <div className="overflow-hidden rounded-[20px] border border-[var(--hairline)] bg-white">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-[var(--hairline)] text-xs text-[var(--ink-tertiary)]">
+                  <th className="px-4 py-3 font-medium">URR</th>
+                  <th className="px-4 py-3 font-medium">Shape</th>
+                  <th className="px-4 py-3 font-medium">Legs</th>
+                  <th className="px-4 py-3 font-medium">Method</th>
+                  <th className="px-4 py-3 font-medium">Amount</th>
+                  <th className="px-4 py-3 font-medium">Created</th>
+                  <th className="px-4 py-3 font-medium" />
+                </tr>
+              </thead>
+              <tbody>
+                {filteredMatched.map((m) => {
+                  const legs = matchLegLabel(m);
+                  return (
+                    <tr key={m.id} className="border-b border-[var(--hairline)] last:border-0">
+                      <td className="px-4 py-3 font-mono text-xs font-semibold text-[var(--pab-red)]">
+                        {m.urr}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge tone={legs.shape === "1↔1" ? "green" : "amber"}>
+                          {legs.shape}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-xs">
+                        <p>
+                          <span className="text-[var(--ink-tertiary)]">Dr </span>
+                          {legs.debits}
+                        </p>
+                        <p>
+                          <span className="text-[var(--ink-tertiary)]">Cr </span>
+                          {legs.credits}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 capitalize">
+                        <Badge tone={m.method === "manual" ? "amber" : "green"}>
+                          {m.method}
+                        </Badge>
+                        {m.comment && (
+                          <p className="mt-1 text-xs text-[var(--ink-tertiary)]">
+                            {m.comment}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 tabular-nums">
+                        {formatCurrency(m.amount)}
+                      </td>
+                      <td className="px-4 py-3 text-[var(--ink-secondary)]">
+                        {formatDateTime(m.createdAt)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {editable && m.method !== "auto" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void unmatch(m.id)}
+                          >
+                            Unmatch
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {filteredMatched.length === 0 && (
+              <p className="py-10 text-center text-sm text-[var(--ink-tertiary)]">
+                {accountMatches.length === 0 ? "No matches yet." : "No matches match search."}
+              </p>
+            )}
+          </div>
         </div>
       )}
 
       {tab === "outstanding" && (
         <div className="space-y-4">
-          {[...unmatchedDebits, ...unmatchedCredits].map((t) => {
+          {[...unmatchedDebits, ...unmatchedCredits]
+            .filter((t) => {
+              // Hide bulk volume noise unless searching — keep named demos + OUT
+              if (t.refNo.startsWith("BULK-") && unmatchedDebits.length + unmatchedCredits.length > 40) {
+                return false;
+              }
+              return true;
+            })
+            .slice(0, 40)
+            .map((t) => {
             const existing = accountOutstanding.find((o) => o.transactionId === t.id);
             return (
               <div
@@ -680,6 +899,11 @@ export default function ReconDetailPage() {
               No outstanding items — fully matched.
             </p>
           )}
+          {unmatchedDebits.length + unmatchedCredits.length > 40 && (
+            <p className="text-center text-xs text-[var(--ink-tertiary)]">
+              Showing key outstanding items. Use Match canvas search for bulk volume rows.
+            </p>
+          )}
 
           <div className="rounded-[20px] border border-[var(--hairline)] bg-white p-5">
             <div className="flex items-center justify-between">
@@ -756,54 +980,114 @@ function TxColumn({
   title,
   items,
   selected,
-  onSelect,
+  onToggle,
   side,
+  search,
+  sort,
+  multiHint,
 }: {
   title: string;
   items: Transaction[];
-  selected: string | null;
-  onSelect: (id: string) => void;
+  selected: string[];
+  onToggle: (id: string) => void;
   side: "debit" | "credit";
+  search: string;
+  sort: SortKey;
+  multiHint: string;
 }) {
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let list = items;
+    if (q) {
+      list = items.filter((t) => {
+        const hay = `${t.refNo} ${t.narrative} ${t.amount}`.toLowerCase();
+        return hay.includes(q);
+      });
+    }
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      if (sort === "amount") return b.amount - a.amount;
+      if (sort === "ref") return a.refNo.localeCompare(b.refNo);
+      return new Date(b.valueDate).getTime() - new Date(a.valueDate).getTime();
+    });
+    return sorted;
+  }, [items, search, sort]);
+
+  const selectedSum = selected.reduce(
+    (s, id) => s + (items.find((t) => t.id === id)?.amount ?? 0),
+    0
+  );
+
   return (
     <div className="rounded-[20px] border border-[var(--hairline)] bg-white">
       <div className="border-b border-[var(--hairline)] px-4 py-3">
-        <h3 className="text-sm font-semibold">{title}</h3>
-        <p className="text-[11px] text-[var(--ink-tertiary)]">{items.length} items</p>
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="text-sm font-semibold">{title}</h3>
+          <p className="text-[11px] tabular-nums text-[var(--ink-tertiary)]">
+            {filtered.length}
+            {filtered.length !== items.length ? ` / ${items.length}` : ""} items
+          </p>
+        </div>
+        <p className="mt-0.5 text-[10px] text-[var(--ink-tertiary)]">{multiHint}</p>
+        {selected.length > 0 && (
+          <p className="mt-1 text-xs font-medium tabular-nums text-[var(--pab-red-deep)]">
+            {selected.length} selected · {formatCurrency(selectedSum)}
+          </p>
+        )}
       </div>
-      <ul className="scrollbar-thin max-h-[420px] overflow-auto p-2">
-        {items.map((t) => (
-          <li key={t.id}>
-            <button
-              type="button"
-              onClick={() => onSelect(t.id)}
-              className={cn(
-                "mb-1 w-full rounded-xl px-3 py-2.5 text-left transition",
-                selected === t.id
-                  ? "bg-[var(--pab-red-soft)] ring-1 ring-[var(--pab-red)]/30"
-                  : "hover:bg-[var(--surface-secondary)]"
-              )}
-            >
-              <div className="flex justify-between gap-2">
-                <span className="text-sm font-medium">{t.refNo}</span>
+      <ul className="scrollbar-thin max-h-[480px] overflow-auto p-2">
+        {filtered.map((t) => {
+          const isOn = selected.includes(t.id);
+          return (
+            <li key={t.id}>
+              <button
+                type="button"
+                onClick={() => onToggle(t.id)}
+                className={cn(
+                  "mb-1 flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left transition",
+                  isOn
+                    ? "bg-[var(--pab-red-soft)] ring-1 ring-[var(--pab-red)]/30"
+                    : "hover:bg-[var(--surface-secondary)]"
+                )}
+              >
                 <span
                   className={cn(
-                    "text-sm tabular-nums font-semibold",
-                    side === "debit" ? "text-ink" : "text-[var(--ink-secondary)]"
+                    "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px]",
+                    isOn
+                      ? "border-[var(--pab-red)] bg-[var(--pab-red)] text-white"
+                      : "border-[var(--hairline)]"
                   )}
+                  aria-hidden
                 >
-                  {formatCurrency(t.amount)}
+                  {isOn ? "✓" : ""}
                 </span>
-              </div>
-              <p className="truncate text-xs text-[var(--ink-tertiary)]">{t.narrative}</p>
-              <p className="text-[10px] text-[var(--ink-tertiary)]">
-                {formatDate(t.valueDate)} · {t.agingDays}d
-              </p>
-            </button>
+                <span className="min-w-0 flex-1">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-sm font-medium">{t.refNo}</span>
+                    <span
+                      className={cn(
+                        "text-sm tabular-nums font-semibold",
+                        side === "debit" ? "text-ink" : "text-[var(--ink-secondary)]"
+                      )}
+                    >
+                      {formatCurrency(t.amount)}
+                    </span>
+                  </div>
+                  <p className="truncate text-xs text-[var(--ink-tertiary)]">
+                    {t.narrative}
+                  </p>
+                  <p className="text-[10px] text-[var(--ink-tertiary)]">
+                    {formatDate(t.valueDate)} · {t.agingDays}d
+                  </p>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+        {filtered.length === 0 && (
+          <li className="py-8 text-center text-xs text-[var(--ink-tertiary)]">
+            {items.length === 0 ? "None" : "No rows match search"}
           </li>
-        ))}
-        {items.length === 0 && (
-          <li className="py-8 text-center text-xs text-[var(--ink-tertiary)]">None</li>
         )}
       </ul>
     </div>

@@ -103,13 +103,15 @@ export interface Transaction {
   agingBucket: AgingBucket;
 }
 
+/** One match group: 1↔1, 1↔M, or M↔1 — never M↔M. */
 export interface Match {
   id: string;
   urr: string;
   accountId: string;
-  debitTxId: string;
-  creditTxId: string;
+  debitTxIds: string[];
+  creditTxIds: string[];
   method: MatchMethod;
+  /** Sum of debit legs (must equal sum of credit legs). */
   amount: number;
   createdAt: string;
   createdBy: string;
@@ -192,10 +194,11 @@ export interface Notification {
   href?: string;
 }
 
+/** Freeze override is branch-scoped — not per GL. */
 export interface FreezeOverrideRequest {
   id: string;
   periodId: string;
-  reconId: string;
+  branchId: string;
   requestedBy: string;
   reason: string;
   status: "pending" | "approved" | "rejected";

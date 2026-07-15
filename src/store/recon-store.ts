@@ -37,13 +37,13 @@ interface Store extends AppState {
   unfreeze: () => Promise<void>;
   confirmSuggestedMatch: (
     accountId: string,
-    debitTxId: string,
-    creditTxId: string
+    debitTxIds: string[],
+    creditTxIds: string[]
   ) => Promise<void>;
   createManualMatch: (
     accountId: string,
-    debitTxId: string,
-    creditTxId: string,
+    debitTxIds: string[],
+    creditTxIds: string[],
     comment: string
   ) => Promise<void>;
   unmatch: (matchId: string) => Promise<void>;
@@ -66,15 +66,41 @@ interface Store extends AppState {
     action: "approve" | "reject" | "review" | "return" | "acknowledge" | "query",
     comment: string
   ) => Promise<void>;
-  requestFreezeOverride: (reconId: string, reason: string) => Promise<void>;
+  requestFreezeOverride: (branchId: string, reason: string) => Promise<void>;
   reviewFreezeOverride: (
     requestId: string,
     decision: "approved" | "rejected"
   ) => Promise<void>;
   runBulkCycle: (cycleId: string) => Promise<void>;
   markNotificationRead: (id: string) => void;
-  canEdit: () => boolean;
+  /** When frozen, editing is allowed only for branches with an approved override (or admin). */
+  canEdit: (accountId?: string) => boolean;
+  isBranchUnfrozen: (branchId: string) => boolean;
   isReadOnlyRole: () => boolean;
+}
+
+/** Validate 1:1, 1:M, or M:1 — reject empty sides and M:M. */
+function validateMatchShape(
+  debitTxIds: string[],
+  creditTxIds: string[]
+): string | null {
+  if (debitTxIds.length === 0 || creditTxIds.length === 0) {
+    return "Select at least one debit and one credit";
+  }
+  if (debitTxIds.length > 1 && creditTxIds.length > 1) {
+    return "Many-to-many is not allowed — use 1↔many or many↔1";
+  }
+  return null;
+}
+
+function sumTxAmounts(
+  transactions: AppState["transactions"],
+  ids: string[]
+): number {
+  return ids.reduce((sum, id) => {
+    const t = transactions.find((x) => x.id === id);
+    return sum + (t?.amount ?? 0);
+  }, 0);
 }
 
 function nextStatus(role: Role, action: string, current: ReconStatus): ReconStatus {
@@ -158,14 +184,33 @@ export const useReconStore = create<Store>()(
         get().showToast("Demo data reset", "info");
       },
 
-      canEdit: () => {
-        const { currentUser, period } = get();
+      isBranchUnfrozen: (branchId) => {
+        const { period, freezeOverrides } = get();
+        if (period.freezeStatus !== "frozen") return true;
+        return freezeOverrides.some(
+          (f) =>
+            f.branchId === branchId &&
+            f.status === "approved" &&
+            f.periodId === period.id
+        );
+      },
+
+      canEdit: (accountId) => {
+        const { currentUser, period, accounts } = get();
         if (!currentUser) return false;
         if (currentUser.role === "inquiry") return false;
-        if (period.freezeStatus === "frozen" && currentUser.role !== "admin") {
+        if (period.freezeStatus !== "frozen") return true;
+        if (currentUser.role === "admin") return true;
+        if (!accountId) {
+          // No account context: allow if user's own branch (or any) has override
+          if (currentUser.branchId) {
+            return get().isBranchUnfrozen(currentUser.branchId);
+          }
           return false;
         }
-        return true;
+        const account = accounts.find((a) => a.id === accountId);
+        if (!account) return false;
+        return get().isBranchUnfrozen(account.branchId);
       },
 
       isReadOnlyRole: () => get().currentUser?.role === "inquiry",
@@ -210,32 +255,42 @@ export const useReconStore = create<Store>()(
         get().showToast("Period reopened");
       },
 
-      confirmSuggestedMatch: async (accountId, debitTxId, creditTxId) => {
-        if (!get().canEdit() || get().isReadOnlyRole()) {
+      confirmSuggestedMatch: async (accountId, debitTxIds, creditTxIds) => {
+        if (!get().canEdit(accountId) || get().isReadOnlyRole()) {
           get().showToast("Editing not permitted", "error");
+          return;
+        }
+        const shapeErr = validateMatchShape(debitTxIds, creditTxIds);
+        if (shapeErr) {
+          get().showToast(shapeErr, "error");
+          return;
+        }
+        const debitSum = sumTxAmounts(get().transactions, debitTxIds);
+        const creditSum = sumTxAmounts(get().transactions, creditTxIds);
+        if (Math.abs(debitSum - creditSum) > 0.01) {
+          get().showToast("Debit and credit totals must match", "error");
           return;
         }
         set({ loading: true });
         await delay();
         const user = get().currentUser!;
-        const debit = get().transactions.find((t) => t.id === debitTxId)!;
         const urrNum = String(get().urrCounter).padStart(5, "0");
+        const allIds = [...debitTxIds, ...creditTxIds];
         const match: Match = {
           id: uid("m"),
           urr: `URR${urrNum}`,
           accountId,
-          debitTxId,
-          creditTxId,
+          debitTxIds,
+          creditTxIds,
           method: "suggested",
-          amount: debit.amount,
+          amount: debitSum,
           createdAt: nowIso(),
           createdBy: user.id,
         };
         set((s) => {
+          const idSet = new Set(allIds);
           const transactions = s.transactions.map((t) =>
-            t.id === debitTxId || t.id === creditTxId
-              ? { ...t, matched: true, matchId: match.id }
-              : t
+            idSet.has(t.id) ? { ...t, matched: true, matchId: match.id } : t
           );
           const reconciliations = s.reconciliations.map((r) =>
             r.accountId === accountId
@@ -255,7 +310,7 @@ export const useReconStore = create<Store>()(
               activity: "Suggested match confirmed",
               urr: match.urr,
               accountNumber: s.accounts.find((a) => a.id === accountId)?.number,
-              remarks: `Matched ${debit.refNo}`,
+              remarks: `${debitTxIds.length}D ↔ ${creditTxIds.length}C`,
               branchId: s.accounts.find((a) => a.id === accountId)?.branchId,
             }),
           };
@@ -263,8 +318,8 @@ export const useReconStore = create<Store>()(
         get().showToast(`Matched — ${match.urr}`);
       },
 
-      createManualMatch: async (accountId, debitTxId, creditTxId, comment) => {
-        if (!get().canEdit() || get().isReadOnlyRole()) {
+      createManualMatch: async (accountId, debitTxIds, creditTxIds, comment) => {
+        if (!get().canEdit(accountId) || get().isReadOnlyRole()) {
           get().showToast("Editing not permitted", "error");
           return;
         }
@@ -272,29 +327,42 @@ export const useReconStore = create<Store>()(
           get().showToast("Comment required for manual match", "error");
           return;
         }
+        const shapeErr = validateMatchShape(debitTxIds, creditTxIds);
+        if (shapeErr) {
+          get().showToast(shapeErr, "error");
+          return;
+        }
+        const debitSum = sumTxAmounts(get().transactions, debitTxIds);
+        const creditSum = sumTxAmounts(get().transactions, creditTxIds);
+        if (Math.abs(debitSum - creditSum) > 0.01) {
+          get().showToast(
+            `Totals must balance (Dr ${debitSum.toLocaleString()} vs Cr ${creditSum.toLocaleString()})`,
+            "error"
+          );
+          return;
+        }
         set({ loading: true });
         await delay();
         const user = get().currentUser!;
-        const debit = get().transactions.find((t) => t.id === debitTxId)!;
         const urrNum = String(get().urrCounter).padStart(5, "0");
+        const allIds = [...debitTxIds, ...creditTxIds];
         const match: Match = {
           id: uid("m"),
           urr: `URR${urrNum}`,
           accountId,
-          debitTxId,
-          creditTxId,
+          debitTxIds,
+          creditTxIds,
           method: "manual",
-          amount: debit.amount,
+          amount: debitSum,
           createdAt: nowIso(),
           createdBy: user.id,
           comment,
           approved: false,
         };
         set((s) => {
+          const idSet = new Set(allIds);
           const transactions = s.transactions.map((t) =>
-            t.id === debitTxId || t.id === creditTxId
-              ? { ...t, matched: true, matchId: match.id }
-              : t
+            idSet.has(t.id) ? { ...t, matched: true, matchId: match.id } : t
           );
           const reconciliations = s.reconciliations.map((r) =>
             r.accountId === accountId
@@ -323,18 +391,15 @@ export const useReconStore = create<Store>()(
       },
 
       unmatch: async (matchId) => {
-        if (!get().canEdit() || get().isReadOnlyRole()) {
+        const match = get().matches.find((m) => m.id === matchId);
+        if (!match) return;
+        if (!get().canEdit(match.accountId) || get().isReadOnlyRole()) {
           get().showToast("Editing not permitted", "error");
           return;
         }
         set({ loading: true });
         await delay(200);
         const user = get().currentUser!;
-        const match = get().matches.find((m) => m.id === matchId);
-        if (!match) {
-          set({ loading: false });
-          return;
-        }
         set((s) => {
           const transactions = s.transactions.map((t) =>
             t.matchId === matchId ? { ...t, matched: false, matchId: undefined } : t
@@ -362,7 +427,7 @@ export const useReconStore = create<Store>()(
       },
 
       saveOutstanding: async (accountId, transactionId, comment, actionTaken) => {
-        if (!get().canEdit() || get().isReadOnlyRole()) {
+        if (!get().canEdit(accountId) || get().isReadOnlyRole()) {
           get().showToast("Editing not permitted", "error");
           return;
         }
@@ -401,7 +466,7 @@ export const useReconStore = create<Store>()(
       },
 
       uploadExhibit: async (meta) => {
-        if (!get().canEdit() || get().isReadOnlyRole()) {
+        if (!get().canEdit(meta.accountId) || get().isReadOnlyRole()) {
           get().showToast("Editing not permitted", "error");
           return;
         }
@@ -431,12 +496,16 @@ export const useReconStore = create<Store>()(
       },
 
       submitRecon: async (reconId, comment) => {
-        if (!get().canEdit() || get().isReadOnlyRole()) {
+        if (get().isReadOnlyRole()) {
           get().showToast("Editing not permitted", "error");
           return;
         }
         const recon = get().reconciliations.find((r) => r.id === reconId);
         if (!recon) return;
+        if (!get().canEdit(recon.accountId)) {
+          get().showToast("Branch is frozen — request a branch override", "error");
+          return;
+        }
         const account = get().accounts.find((a) => a.id === recon.accountId);
         if (!canAccessAccount(get().currentUser, account!)) {
           get().showToast("Not your branch", "error");
@@ -614,18 +683,37 @@ export const useReconStore = create<Store>()(
         get().showToast(`Action “${action}” completed`);
       },
 
-      requestFreezeOverride: async (reconId, reason) => {
+      requestFreezeOverride: async (branchId, reason) => {
         const user = get().currentUser!;
         if (!reason.trim()) {
           get().showToast("Reason required", "error");
           return;
         }
+        if (!branchId) {
+          get().showToast("Select a branch", "error");
+          return;
+        }
+        const pending = get().freezeOverrides.find(
+          (f) =>
+            f.branchId === branchId &&
+            f.status === "pending" &&
+            f.periodId === get().period.id
+        );
+        if (pending) {
+          get().showToast("An override request is already pending for this branch", "error");
+          return;
+        }
+        if (get().isBranchUnfrozen(branchId)) {
+          get().showToast("This branch already has an approved override", "info");
+          return;
+        }
         set({ loading: true });
         await delay();
+        const branch = get().branches.find((b) => b.id === branchId);
         const req: FreezeOverrideRequest = {
           id: uid("fo"),
           periodId: get().period.id,
-          reconId,
+          branchId,
           requestedBy: user.id,
           reason,
           status: "pending",
@@ -639,11 +727,11 @@ export const useReconStore = create<Store>()(
             username: user.username,
             role: user.role,
             activity: "Freeze override requested",
-            reconId,
-            remarks: reason,
+            branchId,
+            remarks: `${branch?.name ?? branchId}: ${reason}`,
           }),
         }));
-        get().showToast("Override request sent to Finance");
+        get().showToast("Branch override request sent to Finance");
       },
 
       reviewFreezeOverride: async (requestId, decision) => {
@@ -654,6 +742,8 @@ export const useReconStore = create<Store>()(
         }
         set({ loading: true });
         await delay();
+        const req = get().freezeOverrides.find((f) => f.id === requestId);
+        const branch = get().branches.find((b) => b.id === req?.branchId);
         set((s) => ({
           loading: false,
           freezeOverrides: s.freezeOverrides.map((f) =>
@@ -666,20 +756,20 @@ export const useReconStore = create<Store>()(
                 }
               : f
           ),
-          period:
-            decision === "approved"
-              ? { ...s.period, freezeStatus: "open" as const }
-              : s.period,
+          // Period stays frozen — only the approved branch is unlocked
           audit: pushAudit(s, {
             userId: user.id,
             username: user.username,
             role: user.role,
             activity: `Freeze override ${decision}`,
-            remarks: requestId,
+            branchId: req?.branchId,
+            remarks: `${branch?.name ?? req?.branchId}: ${decision}`,
           }),
         }));
         get().showToast(
-          decision === "approved" ? "Override approved — period reopened" : "Override rejected",
+          decision === "approved"
+            ? `Override approved — ${branch?.name ?? "branch"} unlocked`
+            : "Override rejected",
           decision === "approved" ? "success" : "info"
         );
       },
@@ -735,7 +825,7 @@ export const useReconStore = create<Store>()(
         })),
     }),
     {
-      name: "pabc-recon-poc-v4",
+      name: "pabc-recon-poc-v5",
       partialize: (s) => {
         const {
           currentUser,
