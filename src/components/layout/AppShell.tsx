@@ -188,7 +188,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </header>
-        <main className="animate-fade-in flex-1 px-6 py-6 pb-12">{children}</main>
+        <main className="animate-fade-in flex-1 px-5 py-4 pb-8">{children}</main>
         <p className="pointer-events-none fixed bottom-3 right-4 z-30 text-[10px] tracking-wide text-[var(--ink-tertiary)]/70">
           Developed by Buddhi Sandeepa
         </p>

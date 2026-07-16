@@ -180,11 +180,11 @@ export default function QueuePage() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="mb-6">
-        <h1 className="font-[family-name:var(--font-outfit)] text-[28px] font-semibold tracking-tight">
+      <div className="mb-3">
+        <h1 className="font-[family-name:var(--font-outfit)] text-xl font-semibold tracking-tight">
           Queue
         </h1>
-        <p className="mt-1 text-[15px] text-[var(--ink-secondary)]">
+        <p className="text-xs text-[var(--ink-secondary)]">
           {roleLabel(role)} · {queue.length} item{queue.length === 1 ? "" : "s"}
           {useBranchFirst
             ? ` across ${branchGroups.length} branch${branchGroups.length === 1 ? "" : "es"}`
@@ -192,22 +192,22 @@ export default function QueuePage() {
         </p>
       </div>
 
-      <div className="grid min-h-[520px] overflow-hidden rounded-[20px] border border-[var(--hairline)] bg-white lg:grid-cols-[340px_1fr]">
-        <div className="border-r border-[var(--hairline)]">
+      <div className="grid h-[calc(100vh-7rem)] overflow-hidden rounded-lg border border-[var(--hairline)] bg-white lg:grid-cols-[300px_1fr]">
+        <div className="flex flex-col border-r border-[var(--hairline)]">
           {useBranchFirst && !branchFocus ? (
             <>
-              <div className="border-b border-[var(--hairline)] px-4 py-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-tertiary)]">
+              <div className="border-b border-[var(--hairline)] px-3 py-2">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--ink-tertiary)]">
                   Branches
                 </p>
                 <input
                   value={branchSearch}
                   onChange={(e) => setBranchSearch(e.target.value)}
                   placeholder="Search branch…"
-                  className="mt-2 h-9 w-full rounded-lg border border-[var(--hairline)] px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
+                  className="mt-1.5 h-7 w-full rounded-md border border-[var(--hairline)] px-2 text-xs outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
                 />
               </div>
-              <ul className="scrollbar-thin max-h-[560px] overflow-auto">
+              <ul className="scrollbar-thin flex-1 overflow-auto">
                 {filteredBranchGroups.map((g) => (
                   <li key={g.branchId}>
                     <button
@@ -218,24 +218,24 @@ export default function QueuePage() {
                         setGlSearch("");
                         setComment("");
                       }}
-                      className="flex w-full items-center justify-between gap-3 border-b border-[var(--hairline)] px-4 py-3 text-left transition hover:bg-black/[0.02]"
+                      className="flex w-full items-center justify-between gap-2 border-b border-[var(--hairline)] px-3 py-1.5 text-left transition hover:bg-black/[0.02]"
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{g.branchName}</p>
-                        <p className="truncate text-xs text-[var(--ink-tertiary)]">
+                        <p className="truncate text-xs font-semibold">{g.branchName}</p>
+                        <p className="truncate text-[10px] text-[var(--ink-tertiary)]">
                           {g.branchCode}
                           {g.branchCode ? " · " : ""}
                           {g.items.length} GL{g.items.length === 1 ? "" : "s"}
                         </p>
                       </div>
-                      <span className="shrink-0 rounded-full bg-[var(--pab-red-soft)] px-2.5 py-0.5 text-xs font-semibold text-[var(--pab-red-deep)]">
+                      <span className="shrink-0 rounded-full bg-[var(--pab-red-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--pab-red-deep)]">
                         {g.items.length}
                       </span>
                     </button>
                   </li>
                 ))}
                 {filteredBranchGroups.length === 0 && (
-                  <li className="px-4 py-16 text-center text-sm text-[var(--ink-tertiary)]">
+                  <li className="px-3 py-10 text-center text-xs text-[var(--ink-tertiary)]">
                     {queue.length === 0
                       ? "Your queue is empty."
                       : "No branches match your search."}
@@ -245,9 +245,9 @@ export default function QueuePage() {
             </>
           ) : (
             <>
-              <div className="border-b border-[var(--hairline)] px-4 py-3">
+              <div className="border-b border-[var(--hairline)] px-3 py-2">
                 {useBranchFirst && focusedBranch ? (
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -255,12 +255,12 @@ export default function QueuePage() {
                         setSelectedId(null);
                         setGlSearch("");
                       }}
-                      className="text-xs font-medium text-[var(--pab-red)] hover:underline"
+                      className="text-[10px] font-medium text-[var(--pab-red)] hover:underline"
                     >
                       ← All branches
                     </button>
-                    <p className="text-sm font-semibold">{focusedBranch.branchName}</p>
-                    <p className="text-[11px] text-[var(--ink-tertiary)]">
+                    <p className="text-xs font-semibold">{focusedBranch.branchName}</p>
+                    <p className="text-[10px] text-[var(--ink-tertiary)]">
                       {focusedBranch.items.length} GL
                       {focusedBranch.items.length === 1 ? "" : "s"} pending
                     </p>
@@ -269,17 +269,17 @@ export default function QueuePage() {
                         value={glSearch}
                         onChange={(e) => setGlSearch(e.target.value)}
                         placeholder="Search GL / account…"
-                        className="h-9 w-full rounded-lg border border-[var(--hairline)] px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
+                        className="h-7 w-full rounded-md border border-[var(--hairline)] px-2 text-xs outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
                       />
                     )}
                   </div>
                 ) : (
-                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-tertiary)]">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--ink-tertiary)]">
                     Inbox
                   </p>
                 )}
               </div>
-              <ul className="scrollbar-thin max-h-[560px] overflow-auto">
+              <ul className="scrollbar-thin flex-1 overflow-auto">
                 {flatList.map(({ r, account, branch }) => (
                   <li key={r.id}>
                     <button
@@ -288,27 +288,27 @@ export default function QueuePage() {
                         setSelectedId(r.id);
                         setComment("");
                       }}
-                      className={`w-full border-b border-[var(--hairline)] px-4 py-3 text-left transition ${
+                      className={`w-full border-b border-[var(--hairline)] px-3 py-1.5 text-left transition ${
                         activeId === r.id
                           ? "bg-[var(--pab-red-soft)]/60"
                           : "hover:bg-black/[0.02]"
                       }`}
                     >
-                      <p className="truncate text-sm font-semibold">{account.name}</p>
-                      <p className="truncate text-xs text-[var(--ink-tertiary)]">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="min-w-0 truncate text-xs font-semibold">{account.name}</p>
+                        <StatusPill status={r.status} />
+                      </div>
+                      <p className="truncate text-[10px] text-[var(--ink-tertiary)]">
                         GL {account.glCode}
                         {!useBranchFirst && branch?.name
                           ? ` · ${branch.name}`
                           : ` · ${account.number}`}
                       </p>
-                      <div className="mt-1.5">
-                        <StatusPill status={r.status} />
-                      </div>
                     </button>
                   </li>
                 ))}
                 {flatList.length === 0 && (
-                  <li className="px-4 py-16 text-center text-sm text-[var(--ink-tertiary)]">
+                  <li className="px-3 py-10 text-center text-xs text-[var(--ink-tertiary)]">
                     {useBranchFirst
                       ? "No GLs in this branch match."
                       : "Your queue is empty."}
@@ -319,45 +319,45 @@ export default function QueuePage() {
           )}
         </div>
 
-        <div className="flex flex-col p-6">
+        <div className="flex flex-col overflow-auto p-4">
           {useBranchFirst && !branchFocus ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
-              <p className="font-[family-name:var(--font-outfit)] text-lg font-semibold">
+            <div className="flex flex-1 flex-col items-center justify-center gap-1.5 text-center">
+              <p className="font-[family-name:var(--font-outfit)] text-sm font-semibold">
                 Select a branch
               </p>
-              <p className="max-w-sm text-sm text-[var(--ink-secondary)]">
+              <p className="max-w-sm text-xs text-[var(--ink-secondary)]">
                 With 80+ branches, review starts at branch level. Open a branch to see its
                 GLs, then act on each account.
               </p>
             </div>
           ) : !selected ? (
-            <div className="flex flex-1 items-center justify-center text-sm text-[var(--ink-tertiary)]">
+            <div className="flex flex-1 items-center justify-center text-xs text-[var(--ink-tertiary)]">
               Select an item to review
             </div>
           ) : (
             <>
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="font-[family-name:var(--font-outfit)] text-xl font-semibold">
-                    {selected.account.name}
-                  </h2>
-                  <p className="text-sm text-[var(--ink-secondary)]">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-[family-name:var(--font-outfit)] text-base font-semibold">
+                      {selected.account.name}
+                    </h2>
+                    <StatusPill status={selected.r.status} />
+                  </div>
+                  <p className="text-xs text-[var(--ink-secondary)]">
                     {selected.account.number} · GL {selected.account.glCode} ·{" "}
                     {selected.branch?.name}
                   </p>
-                  <div className="mt-2">
-                    <StatusPill status={selected.r.status} />
-                  </div>
                 </div>
                 <Link
                   href={`/recon/${selected.r.id}`}
-                  className="text-sm font-medium text-[var(--pab-red)]"
+                  className="shrink-0 text-xs font-medium text-[var(--pab-red)]"
                 >
                   Open workspace →
                 </Link>
               </div>
 
-              <div className="mt-6 grid gap-4 sm:grid-cols-3">
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <Stat label="Recon balance" value={formatCurrency(selected.r.reconBalance)} />
                 <Stat label="GL balance" value={formatCurrency(selected.account.glBalance)} />
                 <Stat
@@ -370,15 +370,15 @@ export default function QueuePage() {
                 />
               </div>
 
-              <div className="mt-6 flex-1">
-                <h3 className="text-xs font-medium uppercase tracking-wide text-[var(--ink-tertiary)]">
+              <div className="mt-3 flex-1">
+                <h3 className="text-[10px] font-medium uppercase tracking-wide text-[var(--ink-tertiary)]">
                   Comments
                 </h3>
-                <ul className="mt-2 max-h-48 space-y-2 overflow-auto">
+                <ul className="mt-1 max-h-36 space-y-1 overflow-auto">
                   {selected.r.comments.map((c) => (
                     <li
                       key={c.id}
-                      className="rounded-xl bg-[var(--surface-secondary)] px-3 py-2 text-sm"
+                      className="rounded-md bg-[var(--surface-secondary)] px-2 py-1 text-xs"
                     >
                       <span className="font-medium capitalize">{c.action}</span>
                       <span className="text-[var(--ink-tertiary)]"> · {c.text}</span>
@@ -388,17 +388,18 @@ export default function QueuePage() {
               </div>
 
               {!isReadOnlyRole() && actions.length > 0 && (
-                <div className="mt-6 border-t border-[var(--hairline)] pt-4">
+                <div className="mt-3 border-t border-[var(--hairline)] pt-3">
                   <textarea
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                     placeholder="Mandatory comment…"
-                    className="h-24 w-full rounded-xl border border-[var(--hairline)] p-3 text-sm outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
+                    className="h-16 w-full rounded-md border border-[var(--hairline)] p-2 text-xs outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
                   />
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-2 flex flex-wrap gap-1.5">
                     {actions.map((a) => (
                       <Button
                         key={a.action}
+                        size="sm"
                         variant={a.variant}
                         onClick={async () => {
                           await workflowAction(selected.r.id, a.action, comment);
@@ -421,9 +422,9 @@ export default function QueuePage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-[var(--surface-secondary)] px-4 py-3">
-      <p className="text-[11px] uppercase tracking-wide text-[var(--ink-tertiary)]">{label}</p>
-      <p className="mt-1 text-sm font-semibold tabular-nums">{value}</p>
+    <div className="rounded-md bg-[var(--surface-secondary)] px-2.5 py-1.5">
+      <p className="text-[10px] uppercase tracking-wide text-[var(--ink-tertiary)]">{label}</p>
+      <p className="text-xs font-semibold tabular-nums">{value}</p>
     </div>
   );
 }

@@ -292,23 +292,19 @@ export default function ReconDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+    <div className="mx-auto max-w-6xl space-y-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <Link
             href="/recon"
-            className="text-xs font-medium text-[var(--ink-tertiary)] hover:text-[var(--pab-red)]"
+            className="text-[11px] font-medium text-[var(--ink-tertiary)] hover:text-[var(--pab-red)]"
           >
             ← Reconciliations
           </Link>
-          <h1 className="mt-1 font-[family-name:var(--font-outfit)] text-[26px] font-semibold tracking-tight">
-            {account.name}
-          </h1>
-          <p className="text-sm text-[var(--ink-secondary)]">
-            {account.number} · GL {account.glCode}
-            {account.currency ? ` · ${account.currency}` : ""} · {branch?.name}
-          </p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h1 className="font-[family-name:var(--font-outfit)] text-lg font-semibold tracking-tight">
+              {account.name}
+            </h1>
             <StatusPill status={recon.status} />
             <Badge tone="red">{account.type}</Badge>
             {account.zeroBalance && <Badge tone="green">Zero balance</Badge>}
@@ -318,36 +314,39 @@ export default function ReconDetailPage() {
               <Badge tone="green">Branch unlocked</Badge>
             )}
           </div>
+          <p className="text-xs text-[var(--ink-secondary)]">
+            {account.number} · GL {account.glCode}
+            {account.currency ? ` · ${account.currency}` : ""} · {branch?.name}
+          </p>
         </div>
         {editable && (
-          <div className="flex flex-col gap-2 sm:items-end">
+          <div className="flex shrink-0 items-end gap-2 sm:flex-col sm:items-end">
             <textarea
               value={submitComment}
               onChange={(e) => setSubmitComment(e.target.value)}
               placeholder="Submission comment…"
-              className="h-20 w-full min-w-[260px] rounded-xl border border-[var(--hairline)] bg-white p-3 text-sm outline-none focus:ring-2 focus:ring-[var(--pab-red)] sm:w-72"
+              className="h-12 w-full min-w-[200px] rounded-lg border border-[var(--hairline)] bg-white p-2 text-xs outline-none focus:ring-2 focus:ring-[var(--pab-red)] sm:w-56"
             />
-            <Button onClick={() => void submitRecon(reconId, submitComment)}>
+            <Button size="sm" onClick={() => void submitRecon(reconId, submitComment)}>
               Submit to Approver
             </Button>
           </div>
         )}
         {frozenBlocked && (
-          <div className="rounded-2xl border border-[#ffccc7] bg-[#fff2f0] p-4 sm:max-w-xs">
-            <p className="text-sm font-medium text-[#b42318]">Branch frozen</p>
-            <p className="mt-1 text-xs text-[var(--ink-secondary)]">
-              Request a Finance override for <strong>{branch?.name}</strong> — unlocks
-              all GLs at this branch, not just this account.
+          <div className="rounded-lg border border-[#ffccc7] bg-[#fff2f0] p-2.5 sm:max-w-xs">
+            <p className="text-xs font-medium text-[#b42318]">Branch frozen</p>
+            <p className="mt-0.5 text-[11px] text-[var(--ink-secondary)]">
+              Request override for <strong>{branch?.name}</strong> — unlocks all GLs at this branch.
             </p>
             <textarea
               value={overrideReason}
               onChange={(e) => setOverrideReason(e.target.value)}
-              className="mt-2 h-16 w-full rounded-lg border border-[var(--hairline)] p-2 text-xs"
+              className="mt-1.5 h-12 w-full rounded-md border border-[var(--hairline)] p-1.5 text-[11px]"
               placeholder="Reason for branch unlock…"
             />
             <Button
               size="sm"
-              className="mt-2"
+              className="mt-1.5"
               onClick={() =>
                 void requestFreezeOverride(account.branchId, overrideReason)
               }
@@ -360,52 +359,52 @@ export default function ReconDetailPage() {
 
       <div
         className={cn(
-          "flex flex-wrap items-center gap-6 rounded-2xl border px-5 py-4",
+          "flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border px-3 py-2",
           glOk
             ? "border-[#b7ebc6] bg-[#f6ffed]"
             : "border-[#ffe58f] bg-[#fffbe6]",
           matchFlash && "animate-match-ok"
         )}
       >
-        <div>
-          <p className="text-[11px] uppercase tracking-wide text-[var(--ink-tertiary)]">
-            Total as per schedule
-          </p>
-          <p className="font-[family-name:var(--font-outfit)] text-lg font-semibold tabular-nums">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-[10px] uppercase tracking-wide text-[var(--ink-tertiary)]">
+            Schedule
+          </span>
+          <span className="text-sm font-semibold tabular-nums">
             {formatCurrency(scheduleBal)}
-          </p>
+          </span>
         </div>
-        <div className="text-[var(--ink-tertiary)]">vs</div>
-        <div>
-          <p className="text-[11px] uppercase tracking-wide text-[var(--ink-tertiary)]">
-            Total as per ledger
-          </p>
-          <p className="font-[family-name:var(--font-outfit)] text-lg font-semibold tabular-nums">
+        <span className="text-[10px] text-[var(--ink-tertiary)]">vs</span>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-[10px] uppercase tracking-wide text-[var(--ink-tertiary)]">
+            Ledger
+          </span>
+          <span className="text-sm font-semibold tabular-nums">
             {formatCurrency(ledgerBal)}
-          </p>
+          </span>
         </div>
-        <div>
-          <p className="text-[11px] uppercase tracking-wide text-[var(--ink-tertiary)]">
-            Difference
-          </p>
-          <p className="font-[family-name:var(--font-outfit)] text-lg font-semibold tabular-nums">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-[10px] uppercase tracking-wide text-[var(--ink-tertiary)]">
+            Diff
+          </span>
+          <span className="text-sm font-semibold tabular-nums">
             {formatCurrency(difference)}
-          </p>
+          </span>
         </div>
         {matchedTotal > 0 && (
-          <div>
-            <p className="text-[11px] uppercase tracking-wide text-[var(--ink-tertiary)]">
-              Matched value
-            </p>
-            <p className="font-[family-name:var(--font-outfit)] text-lg font-semibold tabular-nums">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-[10px] uppercase tracking-wide text-[var(--ink-tertiary)]">
+              Matched
+            </span>
+            <span className="text-sm font-semibold tabular-nums">
               {formatCurrency(matchedTotal)}
-            </p>
+            </span>
           </div>
         )}
         <div className="ml-auto">
           <span
             className={cn(
-              "rounded-full px-3 py-1 text-xs font-semibold",
+              "rounded-full px-2 py-0.5 text-[10px] font-semibold",
               glOk ? "bg-[#e5f8ea] text-[#0e7a32]" : "bg-[#fff4e0] text-[#9a6700]"
             )}
           >
@@ -414,7 +413,7 @@ export default function ReconDetailPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b border-[var(--hairline)]">
+      <div className="flex flex-wrap gap-0.5 border-b border-[var(--hairline)]">
         {(
           [
             ...(hasExhibit
@@ -437,7 +436,7 @@ export default function ReconDetailPage() {
             type="button"
             onClick={() => setTab(item.id)}
             className={cn(
-              "px-4 py-2.5 text-sm font-medium transition",
+              "px-3 py-1.5 text-xs font-medium transition",
               tab === item.id
                 ? "border-b-2 border-[var(--pab-red)] text-ink"
                 : "text-[var(--ink-tertiary)] hover:text-ink"
@@ -544,54 +543,40 @@ export default function ReconDetailPage() {
       )}
 
       {tab === "match" && (
-        <div className="space-y-5">
+        <div className="space-y-2">
           {(isMatchDemo || hasUnmatched) && (
-            <div className="rounded-2xl border border-[var(--hairline)] bg-[var(--pab-red-soft)]/40 px-4 py-3 text-sm text-[var(--ink-secondary)]">
-              <p className="font-medium text-ink">Matching rules</p>
-              <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-xs">
-                <li>
-                  <span className="font-medium text-ink">1↔1, 1↔M, or M↔1</span> — many-to-many
-                  is blocked. Debit and credit totals must balance.
-                </li>
-                <li>
-                  Try <span className="font-medium text-ink">SPLIT-DEMO-*</span> (1↔M) or{" "}
-                  <span className="font-medium text-ink">MERGE-DEMO-*</span> (M↔1).
-                </li>
-                <li>
-                  Use search/sort when there are 100+ unmatched rows (BULK-* volume).
-                </li>
-              </ol>
-            </div>
+            <p className="rounded-md border border-[var(--hairline)] bg-[var(--pab-red-soft)]/30 px-2.5 py-1.5 text-[11px] text-[var(--ink-secondary)]">
+              <span className="font-medium text-ink">Rules:</span> 1↔1, 1↔M, or M↔1 only (M↔M blocked) — totals must balance. Use search/sort for large lists.
+            </p>
           )}
 
           {suggested.length > 0 && (
-            <section className="rounded-[20px] border border-[var(--hairline)] bg-white p-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="font-[family-name:var(--font-outfit)] text-base font-semibold">
-                  Suggested matches
-                </h2>
-                <p className="text-xs text-[var(--ink-tertiary)]">
-                  Showing {Math.min(suggested.length, 12)} of {suggested.length}
+            <section className="rounded-lg border border-[var(--hairline)] bg-white px-2.5 py-2">
+              <div className="flex flex-wrap items-center justify-between gap-1">
+                <h2 className="text-xs font-semibold">Suggested matches</h2>
+                <p className="text-[10px] text-[var(--ink-tertiary)]">
+                  {Math.min(suggested.length, 12)} of {suggested.length}
                 </p>
               </div>
-              <ul className="mt-3 max-h-[280px] space-y-2 overflow-auto">
+              <ul className="mt-1.5 max-h-[140px] space-y-0.5 overflow-auto">
                 {suggested.slice(0, 12).map((s) => (
                   <li
                     key={s.debit.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--surface-secondary)] px-4 py-3"
+                    className="flex items-center justify-between gap-2 rounded-md bg-[var(--surface-secondary)] px-2 py-1"
                   >
-                    <div className="text-sm">
+                    <div className="min-w-0 truncate text-[11px]">
                       <span className="font-medium">{s.debit.refNo}</span>
-                      <span className="mx-2 text-[var(--ink-tertiary)]">↔</span>
+                      <span className="mx-1 text-[var(--ink-tertiary)]">↔</span>
                       <span className="font-medium">{s.credit.refNo}</span>
-                      <span className="ml-3 tabular-nums">
+                      <span className="ml-1.5 tabular-nums">
                         {formatCurrency(s.debit.amount)}
                       </span>
-                      <p className="text-xs text-[var(--ink-tertiary)]">{s.reason}</p>
+                      <span className="ml-1.5 text-[var(--ink-tertiary)]">· {s.reason}</span>
                     </div>
                     {editable && (
                       <Button
                         size="sm"
+                        className="shrink-0"
                         onClick={() => void onConfirmSuggested(s.debit.id, s.credit.id)}
                       >
                         Confirm
@@ -603,24 +588,24 @@ export default function ReconDetailPage() {
             </section>
           )}
 
-          <div className="sticky top-14 z-20 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--hairline)] bg-white/95 px-4 py-3 shadow-[var(--shadow-soft)] backdrop-blur">
+          <div className="sticky top-14 z-20 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--hairline)] bg-white/95 px-2.5 py-1.5 shadow-[var(--shadow-soft)] backdrop-blur">
             <input
               value={txSearch}
               onChange={(e) => setTxSearch(e.target.value)}
               placeholder="Search ref, narrative, amount…"
-              className="h-9 min-w-[180px] flex-1 rounded-lg border border-[var(--hairline)] px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
+              className="h-7 min-w-[140px] flex-1 rounded-md border border-[var(--hairline)] px-2 text-xs outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
             />
             <select
               value={txSort}
               onChange={(e) => setTxSort(e.target.value as SortKey)}
-              className="h-9 rounded-lg border border-[var(--hairline)] bg-white px-2 text-sm"
+              className="h-7 rounded-md border border-[var(--hairline)] bg-white px-1.5 text-xs"
             >
               <option value="date">Sort: date</option>
               <option value="amount">Sort: amount</option>
               <option value="ref">Sort: ref</option>
             </select>
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="rounded-full bg-[var(--surface-secondary)] px-2.5 py-1 font-medium">
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+              <span className="rounded-full bg-[var(--surface-secondary)] px-2 py-0.5 font-medium">
                 {matchModeLabel}
               </span>
               <span className="tabular-nums text-[var(--ink-secondary)]">
@@ -633,7 +618,7 @@ export default function ReconDetailPage() {
               {(selDebits.length > 0 || selCredits.length > 0) && (
                 <span
                   className={cn(
-                    "rounded-full px-2.5 py-1 font-semibold",
+                    "rounded-full px-2 py-0.5 font-semibold",
                     isMm
                       ? "bg-[#ffe8e6] text-[#b42318]"
                       : totalsBalance
@@ -663,7 +648,7 @@ export default function ReconDetailPage() {
             </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[1fr_auto_1fr]">
+          <div className="grid gap-2 lg:grid-cols-[1fr_auto_1fr]">
             <TxColumn
               title="Unmatched debits"
               items={unmatchedDebits}
@@ -674,8 +659,8 @@ export default function ReconDetailPage() {
               sort={txSort}
               multiHint={selCredits.length > 1 ? "single only (credits multi)" : "multi-select OK"}
             />
-            <div className="flex flex-col items-center justify-center gap-3 py-4">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--ink-tertiary)]">
+            <div className="flex flex-col items-center justify-center gap-1.5 py-2">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--ink-tertiary)]">
                 Manual match
               </p>
               {editable ? (
@@ -684,7 +669,7 @@ export default function ReconDetailPage() {
                     value={manualComment}
                     onChange={(e) => setManualComment(e.target.value)}
                     placeholder="Justification (required)…"
-                    className="h-24 w-44 rounded-xl border border-[var(--hairline)] bg-white p-2 text-xs outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
+                    className="h-16 w-36 rounded-md border border-[var(--hairline)] bg-white p-1.5 text-[11px] outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
                   />
                   <Button
                     size="sm"
@@ -693,13 +678,13 @@ export default function ReconDetailPage() {
                   >
                     Match selected
                   </Button>
-                  <p className="max-w-[160px] text-center text-[10px] text-[var(--ink-tertiary)]">
+                  <p className="max-w-[140px] text-center text-[10px] text-[var(--ink-tertiary)]">
                     {selDebits.length} debit{selDebits.length === 1 ? "" : "s"} ·{" "}
                     {selCredits.length} credit{selCredits.length === 1 ? "" : "s"}
                   </p>
                 </>
               ) : (
-                <p className="max-w-[140px] text-center text-xs text-[var(--ink-tertiary)]">
+                <p className="max-w-[120px] text-center text-[11px] text-[var(--ink-tertiary)]">
                   View only
                 </p>
               )}
@@ -719,26 +704,26 @@ export default function ReconDetailPage() {
       )}
 
       {tab === "matched" && (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {accountMatches.length > 8 && (
             <input
               value={matchedSearch}
               onChange={(e) => setMatchedSearch(e.target.value)}
               placeholder="Search URR, ref, method…"
-              className="h-10 w-full max-w-md rounded-xl border border-[var(--hairline)] px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
+              className="h-7 w-full max-w-md rounded-md border border-[var(--hairline)] px-2 text-xs outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
             />
           )}
-          <div className="overflow-hidden rounded-[20px] border border-[var(--hairline)] bg-white">
-            <table className="w-full text-left text-sm">
+          <div className="overflow-hidden rounded-lg border border-[var(--hairline)] bg-white">
+            <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-[var(--hairline)] text-xs text-[var(--ink-tertiary)]">
-                  <th className="px-4 py-3 font-medium">URR</th>
-                  <th className="px-4 py-3 font-medium">Shape</th>
-                  <th className="px-4 py-3 font-medium">Legs</th>
-                  <th className="px-4 py-3 font-medium">Method</th>
-                  <th className="px-4 py-3 font-medium">Amount</th>
-                  <th className="px-4 py-3 font-medium">Created</th>
-                  <th className="px-4 py-3 font-medium" />
+                <tr className="border-b border-[var(--hairline)] text-[10px] text-[var(--ink-tertiary)]">
+                  <th className="px-2 py-1.5 font-medium">URR</th>
+                  <th className="px-2 py-1.5 font-medium">Shape</th>
+                  <th className="px-2 py-1.5 font-medium">Legs</th>
+                  <th className="px-2 py-1.5 font-medium">Method</th>
+                  <th className="px-2 py-1.5 font-medium">Amount</th>
+                  <th className="px-2 py-1.5 font-medium">Created</th>
+                  <th className="px-2 py-1.5 font-medium" />
                 </tr>
               </thead>
               <tbody>
@@ -746,41 +731,38 @@ export default function ReconDetailPage() {
                   const legs = matchLegLabel(m);
                   return (
                     <tr key={m.id} className="border-b border-[var(--hairline)] last:border-0">
-                      <td className="px-4 py-3 font-mono text-xs font-semibold text-[var(--pab-red)]">
+                      <td className="px-2 py-1.5 font-mono text-[11px] font-semibold text-[var(--pab-red)]">
                         {m.urr}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-2 py-1.5">
                         <Badge tone={legs.shape === "1↔1" ? "green" : "amber"}>
                           {legs.shape}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-xs">
-                        <p>
-                          <span className="text-[var(--ink-tertiary)]">Dr </span>
-                          {legs.debits}
-                        </p>
-                        <p>
-                          <span className="text-[var(--ink-tertiary)]">Cr </span>
-                          {legs.credits}
-                        </p>
+                      <td className="px-2 py-1.5 text-[11px]">
+                        <span className="text-[var(--ink-tertiary)]">Dr </span>
+                        {legs.debits}
+                        <span className="mx-1 text-[var(--ink-tertiary)]">·</span>
+                        <span className="text-[var(--ink-tertiary)]">Cr </span>
+                        {legs.credits}
                       </td>
-                      <td className="px-4 py-3 capitalize">
+                      <td className="px-2 py-1.5 capitalize">
                         <Badge tone={m.method === "manual" ? "amber" : "green"}>
                           {m.method}
                         </Badge>
                         {m.comment && (
-                          <p className="mt-1 text-xs text-[var(--ink-tertiary)]">
+                          <span className="ml-1 text-[10px] text-[var(--ink-tertiary)]">
                             {m.comment}
-                          </p>
+                          </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 tabular-nums">
+                      <td className="px-2 py-1.5 tabular-nums">
                         {formatCurrency(m.amount)}
                       </td>
-                      <td className="px-4 py-3 text-[var(--ink-secondary)]">
+                      <td className="px-2 py-1.5 text-[var(--ink-secondary)]">
                         {formatDateTime(m.createdAt)}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-2 py-1.5 text-right">
                         {editable && m.method !== "auto" && (
                           <Button
                             variant="ghost"
@@ -797,7 +779,7 @@ export default function ReconDetailPage() {
               </tbody>
             </table>
             {filteredMatched.length === 0 && (
-              <p className="py-10 text-center text-sm text-[var(--ink-tertiary)]">
+              <p className="py-6 text-center text-xs text-[var(--ink-tertiary)]">
                 {accountMatches.length === 0 ? "No matches yet." : "No matches match search."}
               </p>
             )}
@@ -806,35 +788,21 @@ export default function ReconDetailPage() {
       )}
 
       {tab === "outstanding" && (
-        <div className="space-y-4">
-          {[...unmatchedDebits, ...unmatchedCredits]
-            .filter((t) => {
-              // Hide bulk volume noise unless searching — keep named demos + OUT
-              if (t.refNo.startsWith("BULK-") && unmatchedDebits.length + unmatchedCredits.length > 40) {
-                return false;
-              }
-              return true;
-            })
-            .slice(0, 40)
-            .map((t) => {
+        <div className="space-y-2">
+          <ul className="divide-y divide-[var(--hairline)] rounded-lg border border-[var(--hairline)] bg-white">
+          {[...unmatchedDebits, ...unmatchedCredits].map((t) => {
             const existing = accountOutstanding.find((o) => o.transactionId === t.id);
             return (
-              <div
-                key={t.id}
-                className="rounded-[20px] border border-[var(--hairline)] bg-white p-5"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold">
-                      {t.refNo}{" "}
-                      <span className="font-normal capitalize text-[var(--ink-tertiary)]">
-                        · {t.side}
-                      </span>
-                    </p>
-                    <p className="text-xs text-[var(--ink-secondary)]">{t.narrative}</p>
-                    <p className="mt-1 text-sm tabular-nums font-medium">
-                      {formatCurrency(t.amount)} · aged {t.agingDays}d ({t.agingBucket})
-                    </p>
+              <li key={t.id} className="px-2.5 py-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
+                    <span className="font-semibold">{t.refNo}</span>
+                    <span className="capitalize text-[var(--ink-tertiary)]">{t.side}</span>
+                    <span className="tabular-nums font-medium">{formatCurrency(t.amount)}</span>
+                    <span className="text-[var(--ink-tertiary)]">
+                      {t.agingDays}d · {t.agingBucket}
+                    </span>
+                    <span className="truncate text-[var(--ink-secondary)]">{t.narrative}</span>
                   </div>
                   <Badge
                     tone={
@@ -845,18 +813,18 @@ export default function ReconDetailPage() {
                           : "amber"
                     }
                   >
-                    {t.agingBucket} days
+                    {t.agingBucket}
                   </Badge>
                 </div>
                 {editable ? (
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
                     <textarea
                       defaultValue={existing?.comment ?? outComment[t.id] ?? ""}
                       onChange={(e) =>
                         setOutComment((prev) => ({ ...prev, [t.id]: e.target.value }))
                       }
                       placeholder="Mandatory comment…"
-                      className="h-20 rounded-xl border border-[var(--hairline)] p-3 text-sm outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
+                      className="h-12 rounded-md border border-[var(--hairline)] p-1.5 text-[11px] outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
                     />
                     <textarea
                       defaultValue={existing?.actionTaken ?? outAction[t.id] ?? ""}
@@ -864,7 +832,7 @@ export default function ReconDetailPage() {
                         setOutAction((prev) => ({ ...prev, [t.id]: e.target.value }))
                       }
                       placeholder="Action taken…"
-                      className="h-20 rounded-xl border border-[var(--hairline)] p-3 text-sm outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
+                      className="h-12 rounded-md border border-[var(--hairline)] p-1.5 text-[11px] outline-none focus:ring-2 focus:ring-[var(--pab-red)]"
                     />
                     <Button
                       size="sm"
@@ -883,36 +851,30 @@ export default function ReconDetailPage() {
                   </div>
                 ) : (
                   existing && (
-                    <div className="mt-3 rounded-xl bg-[var(--surface-secondary)] p-3 text-sm">
+                    <div className="mt-1 rounded-md bg-[var(--surface-secondary)] px-2 py-1 text-[11px]">
                       <p>{existing.comment}</p>
-                      <p className="mt-1 text-xs text-[var(--ink-tertiary)]">
+                      <p className="text-[10px] text-[var(--ink-tertiary)]">
                         Action: {existing.actionTaken}
                       </p>
                     </div>
                   )
                 )}
-              </div>
+              </li>
             );
           })}
           {unmatchedDebits.length + unmatchedCredits.length === 0 && (
-            <p className="py-10 text-center text-sm text-[var(--ink-tertiary)]">
+            <li className="py-6 text-center text-xs text-[var(--ink-tertiary)]">
               No outstanding items — fully matched.
-            </p>
+            </li>
           )}
-          {unmatchedDebits.length + unmatchedCredits.length > 40 && (
-            <p className="text-center text-xs text-[var(--ink-tertiary)]">
-              Showing key outstanding items. Use Match canvas search for bulk volume rows.
-            </p>
-          )}
+          </ul>
 
-          <div className="rounded-[20px] border border-[var(--hairline)] bg-white p-5">
+          <div className="rounded-lg border border-[var(--hairline)] bg-white px-2.5 py-2">
             <div className="flex items-center justify-between">
-              <h3 className="font-[family-name:var(--font-outfit)] font-semibold">
-                Exhibits
-              </h3>
+              <h3 className="text-xs font-semibold">Exhibits</h3>
               {editable && (
                 <label className="cursor-pointer">
-                  <span className="rounded-full bg-[var(--pab-red-soft)] px-3 py-1.5 text-xs font-medium text-[var(--pab-red-deep)]">
+                  <span className="rounded-full bg-[var(--pab-red-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--pab-red-deep)]">
                     Upload
                   </span>
                   <input
@@ -923,17 +885,17 @@ export default function ReconDetailPage() {
                 </label>
               )}
             </div>
-            <ul className="mt-3 divide-y divide-[var(--hairline)]">
+            <ul className="mt-1.5 divide-y divide-[var(--hairline)]">
               {accountExhibits.map((e) => (
-                <li key={e.id} className="flex justify-between py-2 text-sm">
+                <li key={e.id} className="flex justify-between py-1 text-[11px]">
                   <span>{e.name}</span>
-                  <span className="text-xs text-[var(--ink-tertiary)]">
+                  <span className="text-[10px] text-[var(--ink-tertiary)]">
                     {formatDate(e.uploadedAt)}
                   </span>
                 </li>
               ))}
               {accountExhibits.length === 0 && (
-                <li className="py-4 text-sm text-[var(--ink-tertiary)]">No exhibits yet.</li>
+                <li className="py-2 text-[11px] text-[var(--ink-tertiary)]">No exhibits yet.</li>
               )}
             </ul>
           </div>
@@ -1019,23 +981,29 @@ function TxColumn({
   );
 
   return (
-    <div className="rounded-[20px] border border-[var(--hairline)] bg-white">
-      <div className="border-b border-[var(--hairline)] px-4 py-3">
+    <div className="rounded-lg border border-[var(--hairline)] bg-white">
+      <div className="border-b border-[var(--hairline)] px-2.5 py-1.5">
         <div className="flex items-baseline justify-between gap-2">
-          <h3 className="text-sm font-semibold">{title}</h3>
-          <p className="text-[11px] tabular-nums text-[var(--ink-tertiary)]">
+          <h3 className="text-xs font-semibold">{title}</h3>
+          <p className="text-[10px] tabular-nums text-[var(--ink-tertiary)]">
             {filtered.length}
-            {filtered.length !== items.length ? ` / ${items.length}` : ""} items
+            {filtered.length !== items.length ? ` / ${items.length}` : ""}
           </p>
         </div>
-        <p className="mt-0.5 text-[10px] text-[var(--ink-tertiary)]">{multiHint}</p>
+        <p className="text-[10px] text-[var(--ink-tertiary)]">{multiHint}</p>
         {selected.length > 0 && (
-          <p className="mt-1 text-xs font-medium tabular-nums text-[var(--pab-red-deep)]">
-            {selected.length} selected · {formatCurrency(selectedSum)}
+          <p className="text-[10px] font-medium tabular-nums text-[var(--pab-red-deep)]">
+            {selected.length} sel · {formatCurrency(selectedSum)}
           </p>
         )}
       </div>
-      <ul className="scrollbar-thin max-h-[480px] overflow-auto p-2">
+      <div className="grid grid-cols-[auto_1fr_auto_auto] gap-x-2 border-b border-[var(--hairline)] px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-[var(--ink-tertiary)]">
+        <span />
+        <span>Ref</span>
+        <span className="text-right">Amount</span>
+        <span className="text-right">Date</span>
+      </div>
+      <ul className="scrollbar-thin max-h-[min(420px,calc(100vh-280px))] overflow-auto p-1">
         {filtered.map((t) => {
           const isOn = selected.includes(t.id);
           return (
@@ -1044,7 +1012,7 @@ function TxColumn({
                 type="button"
                 onClick={() => onToggle(t.id)}
                 className={cn(
-                  "mb-1 flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left transition",
+                  "mb-0.5 grid w-full grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 rounded-md px-1.5 py-1 text-left text-[11px] transition",
                   isOn
                     ? "bg-[var(--pab-red-soft)] ring-1 ring-[var(--pab-red)]/30"
                     : "hover:bg-[var(--surface-secondary)]"
@@ -1052,7 +1020,7 @@ function TxColumn({
               >
                 <span
                   className={cn(
-                    "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px]",
+                    "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border text-[9px]",
                     isOn
                       ? "border-[var(--pab-red)] bg-[var(--pab-red)] text-white"
                       : "border-[var(--hairline)]"
@@ -1061,31 +1029,24 @@ function TxColumn({
                 >
                   {isOn ? "✓" : ""}
                 </span>
-                <span className="min-w-0 flex-1">
-                  <div className="flex justify-between gap-2">
-                    <span className="text-sm font-medium">{t.refNo}</span>
-                    <span
-                      className={cn(
-                        "text-sm tabular-nums font-semibold",
-                        side === "debit" ? "text-ink" : "text-[var(--ink-secondary)]"
-                      )}
-                    >
-                      {formatCurrency(t.amount)}
-                    </span>
-                  </div>
-                  <p className="truncate text-xs text-[var(--ink-tertiary)]">
-                    {t.narrative}
-                  </p>
-                  <p className="text-[10px] text-[var(--ink-tertiary)]">
-                    {formatDate(t.valueDate)} · {t.agingDays}d
-                  </p>
+                <span className="min-w-0 truncate font-medium">{t.refNo}</span>
+                <span
+                  className={cn(
+                    "tabular-nums font-semibold",
+                    side === "debit" ? "text-ink" : "text-[var(--ink-secondary)]"
+                  )}
+                >
+                  {formatCurrency(t.amount)}
+                </span>
+                <span className="whitespace-nowrap text-[10px] text-[var(--ink-tertiary)]">
+                  {formatDate(t.valueDate)}
                 </span>
               </button>
             </li>
           );
         })}
         {filtered.length === 0 && (
-          <li className="py-8 text-center text-xs text-[var(--ink-tertiary)]">
+          <li className="py-4 text-center text-[10px] text-[var(--ink-tertiary)]">
             {items.length === 0 ? "None" : "No rows match search"}
           </li>
         )}

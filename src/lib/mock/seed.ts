@@ -506,36 +506,6 @@ export function createSeed(): AppState {
     },
   ];
 
-  // Bulk unmatched volume for match-canvas UX (~100+ rows)
-  for (let i = 1; i <= 55; i++) {
-    const amt = 10000 + i * 1375;
-    const day = 3 + (i % 60);
-    rawTx.push(
-      {
-        id: `tx_bulk_d_${i}`,
-        accountId: matchDemoAccountId,
-        refNo: `BULK-D-${String(i).padStart(3, "0")}`,
-        side: "debit",
-        amount: amt,
-        valueDate: daysAgo(day),
-        narrative: `Volume debit #${i} — search/filter demo`,
-        matched: false,
-        agingDays: day,
-      },
-      {
-        id: `tx_bulk_c_${i}`,
-        accountId: matchDemoAccountId,
-        refNo: `BULK-C-${String(i).padStart(3, "0")}`,
-        side: "credit",
-        amount: amt,
-        valueDate: daysAgo(day - 1 > 0 ? day - 1 : 1),
-        narrative: `Volume credit #${i} — search/filter demo`,
-        matched: false,
-        agingDays: day - 1 > 0 ? day - 1 : 1,
-      }
-    );
-  }
-
   const transactions = rawTx.map(buildTx);
 
   const matches: Match[] = [
